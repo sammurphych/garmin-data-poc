@@ -1,0 +1,11 @@
+views:
+  - name: health
+    description: Daily wellness (steps, resting HR, stress, Body Battery, sleep, HRV). Use calendar_date for time series.
+    cubes:
+      - join_path: daily_health
+        includes: "*"
+      - join_path: daily_health.dates
+        prefix: true
+        includes:
+          - day_name
+          - is_weekend

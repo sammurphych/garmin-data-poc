@@ -1,0 +1,16 @@
+cubes:
+  - name: dates
+    sql_table: marts.dim_date
+
+    dimensions:
+      - name: calendar_date
+        sql: calendar_date
+        type: time
+        primary_key: true
+        public: true
+      - name: day_name
+        sql: day_name
+        type: string
+      - name: is_weekend
+        sql: is_weekend
+        type: boolean

@@ -1,0 +1,33 @@
+# Prefect Cloud deployment. Deploy with:  uv run prefect deploy --all
+name: garmin-data-poc
+prefect-version: 3.0.0
+
+# Prefect Managed workers clone the repo on each run (GitHub is only code storage, no Actions).
+pull:
+  - prefect.deployments.steps.git_clone:
+      id: clone
+      repository: https://github.com/YOUR_GITHUB_USER/garmin-data-poc.git   # TODO
+      branch: main
+      # Only needed for a private repo: fine-grained token, Contents read-only, this repo only.
+      access_token: "{{ prefect.blocks.secret.github-token }}"
+
+deployments:
+  - name: garmin-daily
+    entrypoint: flows/garmin_daily.py:garmin_daily
+    work_pool:
+      name: managed-pool
+      job_variables:
+        pip_packages:
+          - "prefect>=3.0"
+          - "dlt[motherduck]>=1.0"
+          - "sqlmesh>=0.150"
+          - "httpx>=0.27"
+          - "python-dotenv>=1.0"
+        env:
+          WAREHOUSE: motherduck
+          MOTHERDUCK_DATABASE: garmin
+          GARMIN_START_DATE: "2025-11-01"
+          DLT_PIPELINES_DIR: /tmp/dlt
+    schedules:
+      - cron: "0 6 * * *"
+        timezone: "UTC"   # change to your local timezone

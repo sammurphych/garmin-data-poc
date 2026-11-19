@@ -1,0 +1,11 @@
+views:
+  - name: training
+    description: Workouts and training volume. Use activity_date for time series.
+    cubes:
+      - join_path: activities
+        includes: "*"
+      - join_path: activities.dates
+        prefix: true
+        includes:
+          - day_name
+          - is_weekend

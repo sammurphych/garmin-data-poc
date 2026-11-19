@@ -1,0 +1,20 @@
+{
+  "name": "garmin-dashboards",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "evidence build",
+    "dev": "evidence dev --open /",
+    "sources": "evidence sources",
+    "preview": "evidence preview"
+  },
+  "engines": {
+    "node": ">=18.13"
+  },
+  "dependencies": {
+    "@evidence-dev/core-components": "latest",
+    "@evidence-dev/evidence": "latest",
+    "@evidence-dev/motherduck": "latest"
+  }
+}

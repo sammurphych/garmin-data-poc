@@ -1,0 +1,10 @@
+# Netlify builds the Evidence site itself (no GitHub Actions).
+# Set env var EVIDENCE_SOURCE__motherduck__token (read-only MotherDuck token) in Netlify.
+# Prefect's last task POSTs to this site's build hook after each daily load.
+[build]
+  base    = "dashboards"
+  command = "npm run sources && npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "20"

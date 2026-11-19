@@ -1,0 +1,6 @@
+# Token comes from env var EVIDENCE_SOURCE__motherduck__token (Netlify env var / local shell).
+# Use a MotherDuck read-only token here.
+name: motherduck
+type: motherduck
+options:
+  database: garmin

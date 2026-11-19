@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.duckdb
+*.duckdb.wal
+.dlt/secrets.toml
+transform/logs/
+transform/.cache/
+dashboards/node_modules/
+dashboards/.evidence/
+dashboards/build/
+dashboards/.svelte-kit/

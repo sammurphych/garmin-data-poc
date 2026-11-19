@@ -1,0 +1,57 @@
+cubes:
+  - name: daily_health
+    sql_table: marts.fct_daily_health
+    description: One row per calendar day of Garmin wellness data (steps, HR, stress, Body Battery, sleep, HRV).
+
+    joins:
+      - name: dates
+        sql: "{CUBE}.calendar_date = {dates}.calendar_date"
+        relationship: one_to_one
+
+    dimensions:
+      - name: calendar_date
+        sql: calendar_date
+        type: time
+        primary_key: true
+        public: true
+      - name: hrv_status
+        sql: hrv_status
+        type: string
+
+    measures:
+      - name: days
+        type: count
+      - name: total_steps
+        sql: steps
+        type: sum
+      - name: avg_steps
+        sql: steps
+        type: avg
+        format: number
+      - name: avg_resting_hr
+        sql: resting_hr
+        type: avg
+        description: Average resting heart rate (bpm)
+      - name: avg_stress
+        sql: stress_avg
+        type: avg
+      - name: avg_body_battery_max
+        sql: body_battery_max
+        type: avg
+      - name: total_intensity_minutes
+        sql: intensity_minutes
+        type: sum
+        description: Moderate + 2x vigorous minutes (Garmin's definition)
+      - name: avg_sleep_hours
+        sql: sleep_hours
+        type: avg
+      - name: avg_sleep_score
+        sql: sleep_score
+        type: avg
+      - name: avg_hrv
+        sql: hrv_last_night_avg
+        type: avg
+        description: Average overnight HRV (ms)
+      - name: total_active_calories
+        sql: calories_active
+        type: sum

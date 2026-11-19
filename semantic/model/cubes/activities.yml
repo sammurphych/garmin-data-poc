@@ -1,0 +1,56 @@
+cubes:
+  - name: activities
+    sql_table: marts.fct_activities
+    description: One row per recorded Garmin activity.
+
+    joins:
+      - name: dates
+        sql: "{CUBE}.activity_date = {dates}.calendar_date"
+        relationship: many_to_one
+
+    dimensions:
+      - name: activity_id
+        sql: activity_id
+        type: number
+        primary_key: true
+      - name: activity_name
+        sql: activity_name
+        type: string
+      - name: activity_type
+        sql: activity_type
+        type: string
+      - name: event_type
+        sql: event_type
+        type: string
+      - name: start_time
+        sql: start_time_local
+        type: time
+      - name: activity_date
+        sql: activity_date
+        type: time
+
+    measures:
+      - name: count
+        type: count
+      - name: total_distance_km
+        sql: distance_km
+        type: sum
+      - name: total_moving_minutes
+        sql: moving_minutes
+        type: sum
+      - name: total_elevation_gain_m
+        sql: elevation_gain_m
+        type: sum
+      - name: total_training_load
+        sql: training_load
+        type: sum
+      - name: avg_hr
+        sql: avg_hr
+        type: avg
+      - name: avg_pace_min_per_km
+        sql: pace_min_per_km
+        type: avg
+        description: Average running pace (only running activities have a pace)
+      - name: longest_distance_km
+        sql: distance_km
+        type: max

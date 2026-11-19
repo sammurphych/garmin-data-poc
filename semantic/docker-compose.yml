@@ -1,0 +1,20 @@
+# Cube Core (Apache 2.0) on top of the SQLMesh marts in MotherDuck.
+#   cd semantic && docker compose --env-file ../.env up
+# Playground: http://localhost:4000   SQL API (Postgres wire): localhost:15432
+services:
+  cube:
+    image: cubejs/cube:latest   # pin to a specific version once it works
+    ports:
+      - "4000:4000"
+      - "15432:15432"
+    environment:
+      CUBEJS_DB_TYPE: duckdb
+      CUBEJS_DB_DUCKDB_DATABASE_PATH: "md:${MOTHERDUCK_DATABASE:-garmin}"
+      CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN: ${MOTHERDUCK_READ_TOKEN}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_PG_SQL_PORT: "15432"
+      CUBEJS_SQL_USER: cube
+      CUBEJS_SQL_PASSWORD: ${CUBEJS_API_SECRET}
+    volumes:
+      - ./model:/cube/conf/model
