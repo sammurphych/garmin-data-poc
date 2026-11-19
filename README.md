@@ -28,7 +28,7 @@ Local
 | MotherDuck token (read/write) | Prefect Secret `motherduck-token` | dlt, SQLMesh |
 | Netlify build hook URL | Prefect Secret `evidence-build-hook` | refresh_bi |
 | GitHub fine-grained token (only if the repo is private) | Prefect Secret `github-token` | git clone in `prefect.yaml` |
-| MotherDuck **read-only** token | Netlify env `EVIDENCE_SOURCE__motherduck__token` | Evidence build |
+| MotherDuck dashboards token (read-only on Business plan, a separate regular token on free) | Netlify env `EVIDENCE_SOURCE__motherduck__token` | Evidence build |
 | Everything above, for dev | `.env` (gitignored, copy from `.env.example`) | local runs, Cube, MCP |
 
 ## Setup
@@ -57,7 +57,7 @@ uv run sqlmesh plan                     # apply to prod (backfills from GARMIN_S
 uv run sqlmesh fetchdf "select * from marts.fct_daily_health order by 1 desc limit 5"
 ```
 
-**4. Switch to MotherDuck.** Create a free account and a read/write token, plus a read-only token for Evidence and Cube. Set `WAREHOUSE=motherduck` and `MOTHERDUCK_TOKEN` in `.env`. Then run steps 2 and 3 again (`sqlmesh plan` on the motherduck gateway).
+**4. Switch to MotherDuck.** Create a free account and a read/write token, plus a second token for Evidence and Cube. Read-only (Read Scaling) tokens need the Business plan; on the free plan use a separate regular token so you can revoke it on its own. Set `WAREHOUSE=motherduck` and `MOTHERDUCK_TOKEN` in `.env`. Then run steps 2 and 3 again (`sqlmesh plan` on the motherduck gateway).
 
 **5. Prefect Cloud:**
 ```bash
@@ -79,7 +79,7 @@ The cron runs daily at 06:00 UTC; change `timezone` in `prefect.yaml`. Prefect M
 **6. Evidence on Netlify.** Locally:
 ```bash
 cd dashboards && npm install
-EVIDENCE_SOURCE__motherduck__token=<read-only> npm run sources && npm run dev
+EVIDENCE_SOURCE__motherduck__token=<dashboards token> npm run sources && npm run dev
 ```
 On Netlify, choose *Add new site → Import from Git* and pick this repo; `netlify.toml` sets the build. Add env var `EVIDENCE_SOURCE__motherduck__token`. Under *Build hooks*, create a hook and save its URL as the Prefect Secret `evidence-build-hook`.
 
