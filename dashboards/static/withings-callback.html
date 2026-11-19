@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Withings callback</title>
+  <style>
+    :root { --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --accent: #0969da; --box: #f6f8fa; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --accent: #4493f8; --box: #161b22; }
+    }
+    body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 32px 16px; }
+    main { max-width: 560px; margin: 0 auto; }
+    p { color: var(--muted); }
+    button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; font: inherit; cursor: pointer; }
+    #status { margin-top: 12px; color: var(--fg); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Withings authorised</h1>
+    <p>Copy this page's address. The login script in your terminal is watching the clipboard and finishes on its own.
+       The code in the address expires 30 seconds after you approved, so copy it straight away.</p>
+    <button id="copy" type="button">Copy address</button>
+    <div id="status" role="status"></div>
+  </main>
+  <script>
+    // Nothing is sent anywhere: the address only goes to your clipboard.
+    const status = document.getElementById("status");
+    async function copy() {
+      try {
+        await navigator.clipboard.writeText(location.href);
+        status.textContent = "Copied. Check your terminal.";
+      } catch {
+        status.textContent = "Couldn't copy automatically. Copy the address bar with Cmd+L, then Cmd+C.";
+      }
+    }
+    document.getElementById("copy").addEventListener("click", copy);
+    if (!new URLSearchParams(location.search).has("code")) {
+      status.textContent = "No authorisation code in this address. Start again from the terminal.";
+    }
+  </script>
+</body>
+</html>

@@ -16,8 +16,11 @@ from __future__ import annotations
 import http.server
 import os
 import secrets
+import shutil
+import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -93,6 +96,39 @@ def _wait_for_code_on_localhost(redirect_uri: str, expected_state: str) -> str:
     return received["code"]
 
 
+def _code_from_url(url: str, expected_state: str) -> str | None:
+    query = parse_qs(urlparse(url.strip()).query)
+    if query.get("state", [None])[0] == expected_state and query.get("code"):
+        return query["code"][0]
+    return None
+
+
+def _wait_for_code_on_clipboard(expected_state: str, timeout_s: int = 300) -> str:
+    """Withings won't redirect to localhost, so the redirect lands on a hosted page.
+
+    The code expires 30 seconds after approval, which is tight for pasting by hand, so
+    on macOS this watches the clipboard and exchanges the code as soon as the callback
+    address is copied. Elsewhere it asks for the address to be pasted.
+    """
+    if shutil.which("pbpaste"):
+        print("After approving, copy the address of the page you land on (or click its 'Copy address' button).")
+        print("Watching the clipboard...")
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            clip = subprocess.run(["pbpaste"], capture_output=True, text=True).stdout
+            code = _code_from_url(clip, expected_state)
+            if code:
+                return code
+            time.sleep(0.3)
+        sys.exit("Timed out waiting for the callback address on the clipboard. Run the command again.")
+
+    pasted = input("After approving, paste the full address you were redirected to, then press Enter:\n> ")
+    code = _code_from_url(pasted, expected_state)
+    if not code:
+        sys.exit("That address doesn't match this login attempt (missing code or state mismatch). Run the command again.")
+    return code
+
+
 def authorise() -> None:
     redirect_uri = os.environ["WITHINGS_REDIRECT_URI"]
     state = secrets.token_urlsafe(16)
@@ -107,12 +143,7 @@ def authorise() -> None:
     if on_localhost:
         code = _wait_for_code_on_localhost(redirect_uri, state)
     else:
-        # The code expires 30 seconds after the redirect, so paste straight away.
-        pasted = input("After approving, paste the full URL you were redirected to, then press Enter:\n> ").strip()
-        query = parse_qs(urlparse(pasted).query)
-        if query.get("state", [None])[0] != state:
-            sys.exit("That URL doesn't match this login attempt (state mismatch). Run the command again.")
-        code = query["code"][0]
+        code = _wait_for_code_on_clipboard(state)
 
     body = _request_token(grant_type="authorization_code", code=code, redirect_uri=redirect_uri)
     _save_refresh_token(body["refresh_token"])

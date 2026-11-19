@@ -103,7 +103,7 @@ WAREHOUSE=motherduck uv run sqlmesh plan                                        
 ```
 The `local` gateway keeps its state in `health.duckdb`.
 
-**9. Withings.** At [developer.withings.com](https://developer.withings.com) create an application (public API integration) with callback URL `http://localhost:8765/callback`. Put its client id and secret in `.env`, then authorise once and load:
+**9. Withings.** At [developer.withings.com](https://developer.withings.com) create an application (public API integration). Withings rejects localhost callbacks, so register the Netlify page `https://<your-site>.netlify.app/withings-callback.html` (from `dashboards/static/`) and set the same address as `WITHINGS_REDIRECT_URI`. Put the client id and secret in `.env`, then authorise once and load. After you approve, copy the callback page's address; the script watches the clipboard and exchanges the code within Withings' 30-second limit:
 ```bash
 uv run python -m ingest.withings_auth        # browser login; saves the refresh token to Prefect
 uv run python -m ingest.pipeline withings    # full history on the first run
