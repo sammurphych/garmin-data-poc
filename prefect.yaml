@@ -6,7 +6,7 @@ prefect-version: 3.0.0
 pull:
   - prefect.deployments.steps.git_clone:
       id: clone
-      repository: https://github.com/YOUR_GITHUB_USER/garmin-data-poc.git   # TODO
+      repository: https://github.com/sammurphych/garmin-data-poc.git
       branch: main
       # Only needed for a private repo: fine-grained token, Contents read-only, this repo only.
       access_token: "{{ prefect.blocks.secret.github-token }}"
