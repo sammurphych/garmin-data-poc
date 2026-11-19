@@ -19,3 +19,5 @@ mcp = [
 
 [tool.uv]
 package = false
+# cryptography 49+ ships no Intel-Mac wheels, and building it from source needs Rust and Xcode tools.
+constraint-dependencies = ["cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'"]
