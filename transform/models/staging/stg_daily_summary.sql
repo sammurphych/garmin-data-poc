@@ -7,8 +7,8 @@ MODEL (
 
 SELECT
   CAST(calendar_date AS DATE)            AS calendar_date,
-  movement__steps                        AS steps,
-  movement__floors_ascended              AS floors_ascended,
+  movement__steps__value                 AS steps,
+  movement__floors_ascended__value       AS floors_ascended,
   calories__burned_total                 AS calories_total,
   calories__burned_active                AS calories_active,
   heart_rate__resting_value              AS resting_hr,

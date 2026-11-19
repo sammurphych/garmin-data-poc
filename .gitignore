@@ -10,3 +10,4 @@ dashboards/node_modules/
 dashboards/.evidence/
 dashboards/build/
 dashboards/.svelte-kit/
+logs/
