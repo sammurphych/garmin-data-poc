@@ -65,7 +65,7 @@ def _mark_loaded(end: date) -> None:
 @dlt.source(name="garmin")
 def garmin_source(
     api_key: str = dlt.secrets.value,
-    start_date: str = "2025-11-01",
+    start_date: str = "2009-12-01",
     lookback_days: int = 3,
 ):
     client = GarminClient(api_key)

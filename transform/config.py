@@ -29,5 +29,5 @@ if os.getenv("MOTHERDUCK_TOKEN"):
 config = Config(
     gateways=gateways,
     default_gateway=os.getenv("WAREHOUSE", "local"),
-    model_defaults=ModelDefaultsConfig(dialect="duckdb", start=os.getenv("GARMIN_START_DATE", "2025-11-01")),
+    model_defaults=ModelDefaultsConfig(dialect="duckdb", start=os.getenv("GARMIN_START_DATE", "2009-12-01")),
 )

@@ -35,7 +35,7 @@ def run_pipeline():
     )
     source = garmin_source(
         api_key=os.environ["GARMIN_API_KEY"],
-        start_date=os.getenv("GARMIN_START_DATE", "2025-11-01"),
+        start_date=os.getenv("GARMIN_START_DATE", "2009-12-01"),
     )
     info = pipeline.run(source)
     print(info)
