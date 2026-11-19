@@ -107,8 +107,10 @@ def garmin_source(
         for s, e in _chunks(begin, end, MAX_DAYS_SLEEP):
             body = client.get("/sleep-service/sleep/dailySleepSummariesByDate",
                               {"startDate": s.isoformat(), "endDate": e.isoformat()})
-            if body:
-                yield body
+            # Nights with no recorded sleep come back as placeholder rows with every field null.
+            nights = [n for n in body or [] if n.get("calendarDate")]
+            if nights:
+                yield nights
         _mark_loaded(end)
 
     @dlt.resource(name="hrv", primary_key="calendarDate", write_disposition="merge")
