@@ -1,4 +1,4 @@
-"""Daily Garmin pipeline: dlt load -> SQLMesh run -> Evidence (Netlify) rebuild.
+"""Daily health pipeline: dlt loads (Garmin, Withings) -> SQLMesh run -> Evidence (Netlify) rebuild.
 
 Local:  uv run python flows/garmin_daily.py        (reads .env)
 Cloud:  deployed via prefect.yaml to a Prefect Managed work pool, secrets from Secret blocks.
@@ -23,6 +23,9 @@ SECRETS = {
     "garmin-api-key": "GARMIN_API_KEY",
     "motherduck-token": "MOTHERDUCK_TOKEN",
     "evidence-build-hook": "EVIDENCE_BUILD_HOOK",
+    "withings-client-id": "WITHINGS_CLIENT_ID",
+    "withings-client-secret": "WITHINGS_CLIENT_SECRET",
+    "sqlmesh-state-db-url": "SQLMESH_STATE_DB_URL",
 }
 
 
@@ -39,10 +42,22 @@ def load_secrets() -> None:
 
 
 @task(retries=2, retry_delay_seconds=300)
-def extract_load() -> str:
-    from ingest.pipeline import run_pipeline
+def extract_garmin() -> str:
+    from ingest.pipeline import run_garmin
 
-    info = run_pipeline()
+    info = run_garmin()
+    get_run_logger().info(str(info))
+    return str(info)
+
+
+@task(retries=1, retry_delay_seconds=300)
+def extract_withings() -> str:
+    from ingest.pipeline import run_withings, withings_configured
+
+    if not withings_configured():
+        get_run_logger().warning("Withings client id/secret not set; skipping Withings")
+        return "skipped"
+    info = run_withings()
     get_run_logger().info(str(info))
     return str(info)
 
@@ -71,9 +86,14 @@ def refresh_bi() -> None:
 @flow(name="garmin-daily", log_prints=True)
 def garmin_daily() -> None:
     load_secrets()
-    extract_load()
+    extract_garmin()
+    # A Withings failure (e.g. an expired login) shouldn't stop Garmin data reaching the
+    # dashboards, but the run still ends Failed so it gets noticed.
+    withings = extract_withings(return_state=True)
     transform()
     refresh_bi()
+    if withings.is_failed():
+        raise RuntimeError("Withings load failed; Garmin, SQLMesh and dashboards still updated")
 
 
 if __name__ == "__main__":

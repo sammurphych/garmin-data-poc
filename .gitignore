@@ -11,3 +11,4 @@ dashboards/.evidence/
 dashboards/build/
 dashboards/.svelte-kit/
 logs/
+sqlmesh_state.json

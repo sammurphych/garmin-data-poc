@@ -14,7 +14,7 @@ Local
 
 | Path | What it does |
 |---|---|
-| `ingest/` | dlt source for the Garmin Personal API: `daily_summaries`, `activities`, `sleep`, `hrv` |
+| `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities`, `sleep`, `hrv`) and Withings (`measures`: weight and body composition) |
 | `transform/` | SQLMesh project (`config.py` picks the gateway: `local` or `motherduck`) |
 | `flows/garmin_daily.py` | Prefect flow; `prefect.yaml` is the deployment and schedule |
 | `semantic/` | Cube Core models and views, docker compose, MCP server |
@@ -27,6 +27,9 @@ Local
 | Garmin personal API key | Prefect Secret `garmin-api-key` | dlt |
 | MotherDuck token (read/write) | Prefect Secret `motherduck-token` | dlt, SQLMesh |
 | Netlify build hook URL | Prefect Secret `evidence-build-hook` | refresh_bi |
+| SQLMesh state database URL (Postgres, e.g. Neon) | Prefect Secret `sqlmesh-state-db-url` | SQLMesh |
+| Withings client id / secret | Prefect Secrets `withings-client-id`, `withings-client-secret` | dlt |
+| Withings refresh token (rotates every run) | Prefect Secret `withings-refresh-token`, local runs too | dlt |
 | GitHub fine-grained token (only if the repo is private) | Prefect Secret `github-token` | git clone in `prefect.yaml` |
 | MotherDuck dashboards token (read-only on Business plan, a separate regular token on free) | Netlify env `EVIDENCE_SOURCE__motherduck__token` | Evidence build |
 | Everything above, for dev | `.env` (gitignored, copy from `.env.example`) | local runs, Cube, MCP |
@@ -91,8 +94,26 @@ cd .. && claude mcp add garmin-cube -- uv run --group mcp python semantic/mcp_se
 ```
 Then ask Claude: *"What was my average resting HR last week vs the 4 weeks before?"*
 
+**8. SQLMesh state in Postgres.** Create a free [Neon](https://neon.tech) project and copy its connection string into `.env` as `SQLMESH_STATE_DB_URL`. Move the existing state across, then store the URL for Prefect:
+```bash
+cd transform
+SQLMESH_STATE_DB_URL= WAREHOUSE=motherduck uv run sqlmesh state export -o ../sqlmesh_state.json   # from MotherDuck
+WAREHOUSE=motherduck uv run sqlmesh state import -i ../sqlmesh_state.json                        # into Postgres
+WAREHOUSE=motherduck uv run sqlmesh plan                                                          # expect "no changes"
+```
+The `local` gateway keeps its state in `health.duckdb`.
+
+**9. Withings.** At [developer.withings.com](https://developer.withings.com) create an application (public API integration) with callback URL `http://localhost:8765/callback`. Put its client id and secret in `.env`, then authorise once and load:
+```bash
+uv run python -m ingest.withings_auth        # browser login; saves the refresh token to Prefect
+uv run python -m ingest.pipeline withings    # full history on the first run
+cd transform && uv run sqlmesh create_external_models && uv run sqlmesh plan
+```
+Save `withings-client-id` and `withings-client-secret` as Prefect Secrets, then `prefect deploy --all`.
+
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).
 - Every run re-pulls the last 3 days, because Garmin revises recent days. The merge on natural keys keeps rows unique, and SQLMesh `lookback 3` reprocesses the same days.
-- SQLMesh state is stored in MotherDuck, which is fine for a POC. Use Postgres for production.
+- SQLMesh state for the motherduck gateway is in Postgres when `SQLMESH_STATE_DB_URL` is set, and in MotherDuck otherwise.
+- Withings rotates its refresh token on every use, so the token lives only in the Prefect Secret `withings-refresh-token`. Laptop and cloud runs both read and update it there. Withings asks for at most one poll per user every 10 minutes.
 - Cube runs locally. To keep it online for free, deploy the same image to Render's free tier (it sleeps when idle).

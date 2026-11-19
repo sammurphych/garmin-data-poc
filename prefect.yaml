@@ -17,13 +17,14 @@ deployments:
     work_pool:
       name: managed-pool
       job_variables:
-        # Same versions as uv.lock. SQLMesh upgrades its state in MotherDuck, so worker and laptop must match.
+        # Same versions as uv.lock. SQLMesh upgrades its state database, so worker and laptop must match.
         pip_packages:
           - "prefect==3.9.3"
           - "dlt[motherduck]==1.32.0"
           - "sqlmesh==0.236.4"
           - "httpx==0.28.1"
           - "python-dotenv==1.2.4"
+          - "psycopg2-binary==2.9.13"
         env:
           WAREHOUSE: motherduck
           MOTHERDUCK_DATABASE: health
