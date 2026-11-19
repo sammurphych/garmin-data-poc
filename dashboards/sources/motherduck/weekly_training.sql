@@ -1,1 +1,1 @@
-select * from garmin.marts.agg_weekly_training order by week_start
+select * from health.marts.agg_weekly_training order by week_start

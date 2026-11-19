@@ -25,7 +25,7 @@ deployments:
           - "python-dotenv>=1.0"
         env:
           WAREHOUSE: motherduck
-          MOTHERDUCK_DATABASE: garmin
+          MOTHERDUCK_DATABASE: health
           GARMIN_START_DATE: "2009-12-01"
           DLT_PIPELINES_DIR: /tmp/dlt
     schedules:

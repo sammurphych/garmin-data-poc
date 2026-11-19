@@ -1,6 +1,6 @@
 """SQLMesh config. Gateway is chosen by WAREHOUSE (local | motherduck), same as dlt.
 
-Both the local file and the MotherDuck db are named `garmin`, so models
+Both the local file and the MotherDuck db are named `health`, so models
 resolve the same catalog either way.
 """
 
@@ -15,13 +15,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(REPO_ROOT / ".env")
 
 gateways = {
-    "local": GatewayConfig(connection=DuckDBConnectionConfig(database=str(REPO_ROOT / "garmin.duckdb"))),
+    "local": GatewayConfig(connection=DuckDBConnectionConfig(database=str(REPO_ROOT / "health.duckdb"))),
 }
 if os.getenv("MOTHERDUCK_TOKEN"):
     gateways["motherduck"] = GatewayConfig(
         # State also lives in MotherDuck. Fine for a POC; use Postgres for state in production.
         connection=MotherDuckConnectionConfig(
-            database=os.getenv("MOTHERDUCK_DATABASE", "garmin"),
+            database=os.getenv("MOTHERDUCK_DATABASE", "health"),
             token=os.environ["MOTHERDUCK_TOKEN"],
         ),
     )

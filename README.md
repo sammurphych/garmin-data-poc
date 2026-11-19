@@ -5,11 +5,11 @@ A trial of **dlt → MotherDuck (DuckDB) → SQLMesh → Cube Core → Evidence 
 ```
 Prefect Cloud  (cron 06:00 UTC, Prefect Managed work pool, code cloned from git)
   └─ garmin-daily flow
-       1. extract_load  dlt: Garmin Personal API → MotherDuck  garmin.raw_garmin.*
+       1. extract_load  dlt: Garmin Personal API → MotherDuck  health.raw_garmin.*
        2. transform     SQLMesh run: staging.* views → marts.* tables (+ audits)
        3. refresh_bi    POST Netlify build hook → Evidence site rebuilds from MotherDuck
 Local
-  Cube Core (docker) over garmin.marts → REST/SQL API → MCP server → Claude
+  Cube Core (docker) over health.marts → REST/SQL API → MCP server → Claude
 ```
 
 | Path | What it does |
@@ -41,11 +41,11 @@ uv sync --all-groups
 
 **1. Garmin key.** In Garmin Connect (web) open the Personal API settings, accept the terms and create a key (1-year expiry). The key is shown only once. Garmin emails you about a week before it expires.
 
-**2. Load locally into `./garmin.duckdb`** (`WAREHOUSE=local`):
+**2. Load locally into `./health.duckdb`** (`WAREHOUSE=local`):
 ```bash
 uv run python -m ingest.pipeline
-uv run dlt pipeline garmin show         # browse loaded tables
-uv run dlt pipeline garmin schema       # check the real column names
+uv run dlt pipeline garmin_local show         # browse loaded tables
+uv run dlt pipeline garmin_local schema       # check the real column names
 ```
 The staging SQL assumes dlt's flattened names, such as `heart_rate__resting_value` and `sleep_scores__overall__value`. If a field never appears in your data, dlt won't create that column. Adjust `transform/models/staging/*.sql` to match the schema output.
 

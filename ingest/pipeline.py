@@ -20,15 +20,16 @@ DATASET = "raw_garmin"
 def destination():
     if os.getenv("WAREHOUSE", "local") == "motherduck":
         return dlt.destinations.motherduck(credentials={
-            "database": os.getenv("MOTHERDUCK_DATABASE", "garmin"),
+            "database": os.getenv("MOTHERDUCK_DATABASE", "health"),
             "password": os.environ["MOTHERDUCK_TOKEN"],
         })
-    return dlt.destinations.duckdb(str(REPO_ROOT / "garmin.duckdb"))
+    return dlt.destinations.duckdb(str(REPO_ROOT / "health.duckdb"))
 
 
 def run_pipeline():
     pipeline = dlt.pipeline(
-        pipeline_name="garmin",
+        # One pipeline per warehouse. Each tracks its own load progress, so a fresh warehouse backfills in full.
+        pipeline_name=f"garmin_{os.getenv('WAREHOUSE', 'local')}",
         destination=destination(),
         dataset_name=DATASET,
         pipelines_dir=os.getenv("DLT_PIPELINES_DIR"),  # None -> ~/.dlt; state is also kept in the destination

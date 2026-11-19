@@ -3,4 +3,4 @@
 name: motherduck
 type: motherduck
 options:
-  database: garmin
+  database: health

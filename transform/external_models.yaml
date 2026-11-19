@@ -1,4 +1,4 @@
-- name: '"garmin"."raw_garmin"."activities"'
+- name: '"health"."raw_garmin"."activities"'
   columns:
     activity_id: BIGINT
     activity_name: TEXT
@@ -135,7 +135,7 @@
     power_time_in_zone_5: DOUBLE
     avg_elevation: DOUBLE
   gateway: local
-- name: '"garmin"."raw_garmin"."daily_summaries"'
+- name: '"health"."raw_garmin"."daily_summaries"'
   columns:
     uuid: TEXT
     user_profile_pk: BIGINT
@@ -218,7 +218,7 @@
     body_battery__dynamic_feedback_event__feedback_short_type: TEXT
     body_battery__dynamic_feedback_event__feedback_long_type: TEXT
   gateway: local
-- name: '"garmin"."raw_garmin"."hrv"'
+- name: '"health"."raw_garmin"."hrv"'
   columns:
     calendar_date: TEXT
     last_night_avg: BIGINT
@@ -234,7 +234,7 @@
     baseline__balanced_upper: BIGINT
     baseline__marker_value: DOUBLE
   gateway: local
-- name: '"garmin"."raw_garmin"."sleep"'
+- name: '"health"."raw_garmin"."sleep"'
   columns:
     id: BIGINT
     user_profile_pk: BIGINT
