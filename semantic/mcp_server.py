@@ -35,15 +35,49 @@ INSTRUCTIONS = (
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
 
+class CubeError(Exception):
+    """Cube couldn't be reached or refused the request; the message says which, for the model to relay."""
+
+
 def _headers() -> dict:
-    token = jwt.encode({"exp": int(time.time()) + 600}, os.environ["CUBEJS_API_SECRET"], algorithm="HS256")
+    secret = os.getenv("CUBEJS_API_SECRET")
+    if not secret:
+        raise CubeError("CUBEJS_API_SECRET is not set on the MCP server")
+    token = jwt.encode({"exp": int(time.time()) + 600}, secret, algorithm="HS256")
     return {"Authorization": token, "Content-Type": "application/json"}
+
+
+def _cube(method: str, path: str, **kwargs: Any) -> httpx.Response:
+    """Call Cube, turning connection failures and auth/URL mistakes into a CubeError that names the cause."""
+    url = f"{CUBE_API_URL}{path}"
+    try:
+        resp = httpx.request(method, url, headers=_headers(), timeout=120, **kwargs)
+    except httpx.TimeoutException as e:
+        raise CubeError(f"Cube at {CUBE_API_URL} didn't answer within 120 s (it may be waking up; try again)") from e
+    except httpx.HTTPError as e:
+        raise CubeError(f"couldn't reach Cube at {CUBE_API_URL}: {type(e).__name__}: {e}") from e
+    if resp.status_code in (401, 403):
+        raise CubeError(f"Cube refused the token ({resp.status_code}): CUBEJS_API_SECRET differs from Cube's")
+    if resp.status_code == 404:
+        raise CubeError(f"{url} returned 404: CUBE_API_URL should end in /cubejs-api/v1")
+    return resp
+
+
+def _error(e: Exception) -> str:
+    log.error("Cube call failed: %s", e)
+    return json.dumps({"error": str(e), "cube_api_url": CUBE_API_URL})
 
 
 def describe_semantic_layer() -> str:
     """List the views (health, training, body) with their measures, dimensions and descriptions.
     Call this first to learn which member names exist before calling `query`."""
-    meta = httpx.get(f"{CUBE_API_URL}/meta", headers=_headers(), timeout=120).raise_for_status().json()
+    try:
+        resp = _cube("GET", "/meta")
+        if resp.status_code >= 400:
+            raise CubeError(f"Cube /meta returned {resp.status_code}: {resp.text[:300]}")
+        meta = resp.json()
+    except (CubeError, ValueError) as e:
+        return _error(e)
     out = []
     for c in meta.get("cubes", []):
         if c.get("type") != "view":
@@ -96,8 +130,11 @@ def query(
     # Cube answers "Continue wait" while a query is still being prepared.
     # A Render instance waking from sleep can take ~60 s, hence the long timeout.
     for _ in range(30):
-        resp = httpx.post(f"{CUBE_API_URL}/load", headers=_headers(), json={"query": q}, timeout=120)
-        body = resp.json()
+        try:
+            resp = _cube("POST", "/load", json={"query": q})
+            body = resp.json()
+        except (CubeError, ValueError) as e:
+            return _error(e)
         if body.get("error") == "Continue wait":
             time.sleep(1)
             continue
