@@ -1,5 +1,5 @@
 ---
-title: Garmin Health & Training
+title: Health & Training
 ---
 
 ```sql kpis
@@ -58,4 +58,4 @@ where week_start >= current_date - interval 26 week
 <BarChart data={weekly} x=week_start y=moving_minutes series=activity_type title="Weekly moving minutes by activity type" />
 <BarChart data={weekly} x=week_start y=training_load series=activity_type title="Weekly training load" />
 
-[All activities →](/activities)
+[All activities →](/activities) · [Weight →](/weight)
