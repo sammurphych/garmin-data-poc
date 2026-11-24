@@ -86,11 +86,7 @@ EVIDENCE_SOURCE__motherduck__token=<dashboards token> npm run sources && npm run
 ```
 On Netlify, choose *Add new site → Import from Git* and pick this repo; `netlify.toml` sets the build. Add env var `EVIDENCE_SOURCE__motherduck__token`. Under *Build hooks*, create a hook and save its URL as the Prefect Secret `evidence-build-hook`.
 
-**7. Cube on Render, and the MCP server.** Cube runs on Render's free tier from `render.yaml` and `semantic/Dockerfile` (it sleeps when idle, so the first query after a while takes 30-60 s). In Render choose *New → Blueprint*, pick this repo, and set the two secret env vars it asks for: `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN` (the dashboards token) and `CUBEJS_API_SECRET` (same value as in `.env`). Then set `CUBE_API_URL=https://<service>.onrender.com/cubejs-api/v1` in `.env` and register the MCP server with Claude Code:
-```bash
-claude mcp add health-cube -- uv run --group mcp python semantic/mcp_server.py
-```
-Then ask Claude: *"What was my average resting HR last week vs the 4 weeks before?"* The views are `health` (Garmin daily wellness), `training` (activities) and `body` (Withings weight).
+**7. Cube on Render, and the MCP server.** Cube runs on Render's free tier from `render.yaml` and `semantic/Dockerfile` (it sleeps when idle, so the first query after a while takes 30-60 s). In Render choose *New → Blueprint*, pick this repo, and set the secret env vars it asks for: `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN` and `motherduck_token` (both the dashboards token) and `CUBEJS_API_SECRET` (same value as in `.env`). Then set `CUBE_API_URL=https://<service>.onrender.com/cubejs-api/v1` in `.env`, using the URL on the service page (Render may add a suffix such as `-90ae`). The MCP server is registered for Claude Code by `.mcp.json` in this folder; open the project in Claude Code and approve `health-cube` when asked. Then ask Claude: *"What was my average resting HR last week vs the 4 weeks before?"* The views are `health` (Garmin daily wellness), `training` (activities) and `body` (Withings weight).
 
 **8. SQLMesh state in Postgres.** Create a free [Neon](https://neon.tech) project and copy its connection string into `.env` as `SQLMESH_STATE_DB_URL`. Move the existing state across, then store the URL for Prefect:
 ```bash

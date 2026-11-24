@@ -1,7 +1,7 @@
 """MCP server exposing the Cube semantic layer (health, training, body views).
 
 Register with Claude Code (from the repo root). CUBE_API_URL in .env points at Cube:
-    claude mcp add health-cube -- uv run --group mcp python semantic/mcp_server.py
+    Registered for Claude Code by .mcp.json at the repo root.
 
 The same two functions back the local-model chat in semantic/local_chat.py.
 """
