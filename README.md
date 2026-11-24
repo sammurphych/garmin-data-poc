@@ -17,7 +17,7 @@ Local
 
 | Path | What it does |
 |---|---|
-| `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities`, `sleep`, `hrv`) and Withings (`measures`: weight and body composition) |
+| `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities` with `split_summaries`, `activity_samples`, `sleep`, `hrv`, `vo2max`) and Withings (`measures`: weight and body composition) |
 | `transform/` | SQLMesh project (`config.py` picks the gateway: `local` or `motherduck`) |
 | `flows/garmin_daily.py` | Prefect flow; `prefect.yaml` is the deployment and schedule |
 | `semantic/` | Cube Core models and views (`health`, `training`, `body`), Render Dockerfile, MCP server, local-model chat |
@@ -129,6 +129,16 @@ How it is locked down:
 - **Tokens.** Access tokens last an hour and only work on this server's `/mcp` address. Refresh tokens rotate and can't be reused.
 - **Read-only.** The server holds `CUBEJS_API_SECRET`, never the MotherDuck token. Its logs record sign-ins and the queries asked, never the data returned.
 - **Sign out everywhere.** Regenerate `MCP_SIGNING_KEY` in Render. That ends every token; reconnect the connector afterwards.
+
+**12. Activity recordings, splits and best efforts.** The `activity_samples` resource loads each activity's per-second recording (time, distance, heart rate, pace, grade-adjusted pace, elevation, cadence, power, running dynamics; GPS is left out). SQLMesh turns runs into `marts.fct_activity_km_splits` (one row per km) and `marts.fct_best_efforts` (fastest 1 km, mile, 5 km, 10 km, half, 30 km and marathon *within* each run), and Garmin's segment totals into `marts.fct_activity_segments`. Cube serves them as the `splits`, `efforts` and `segments` views; VO2max is in `health`.
+
+A run fetches at most a year of recordings (about 2 s each), so the first backfill takes about 18 runs. The incremental models only revisit the last 3 days, so load the history **before** adding the models, or older runs never get splits:
+```bash
+# from the repo root, not near 06:00 UTC when the Prefect run starts; each pass is up to ~15 min
+for i in $(seq 1 18); do WAREHOUSE=motherduck uv run python -m ingest.pipeline garmin || break; done
+cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WAREHOUSE=motherduck uv run sqlmesh plan
+```
+Render redeploys Cube from the push. The Personal API has no splits, laps, heart-rate zones or weather endpoints, so splits and best efforts are calculated from the recordings; for 2025 onwards they match Garmin's own `fastest_split_*` figures to 0.1 s.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).

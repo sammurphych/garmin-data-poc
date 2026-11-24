@@ -55,3 +55,13 @@ cubes:
       - name: total_active_calories
         sql: calories_active
         type: sum
+      - name: avg_running_vo2max
+        sql: running_vo2max
+        type: avg
+        description: Garmin's running VO2max estimate (ml/kg/min); only days with an estimate count
+      - name: max_running_vo2max
+        sql: running_vo2max
+        type: max
+      - name: avg_cycling_vo2max
+        sql: cycling_vo2max
+        type: avg

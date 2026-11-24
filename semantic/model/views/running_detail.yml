@@ -1,0 +1,28 @@
+# One view per grain, each with the run it belongs to, so queries never mix rows of different grains.
+# Add activities.activity_id to dimensions to keep runs apart.
+views:
+  - name: splits
+    description: Kilometre splits of runs. Group by activities' activity_id and km for one run's splits.
+    cubes:
+      - join_path: km_splits
+        includes: "*"
+      - join_path: km_splits.activities
+        includes: [activity_id, activity_name, activity_type, activity_date, start_time]
+
+  - name: efforts
+    description: >
+      Best efforts inside runs (fastest 1 km, 1 mile, 5 km, 10 km, half, 30 km, marathon stretch of each run).
+      For "best 5K ever", filter efforts.effort = '5 km' and order by best_time_min with activity_id as a dimension.
+    cubes:
+      - join_path: best_efforts
+        includes: "*"
+      - join_path: best_efforts.activities
+        includes: [activity_id, activity_name, activity_type, activity_date, start_time]
+
+  - name: segments
+    description: Workout segments (warm-up, main set, recovery, cool-down; run/walk) per activity.
+    cubes:
+      - join_path: activity_segments
+        includes: "*"
+      - join_path: activity_segments.activities
+        includes: [activity_id, activity_name, activity_type, activity_date, start_time]

@@ -1,0 +1,34 @@
+cubes:
+  - name: activity_segments
+    sql_table: marts.fct_activity_segments
+    description: >
+      Garmin's per-segment totals of each activity. INTERVAL_WARMUP / INTERVAL_ACTIVE / INTERVAL_RECOVERY /
+      INTERVAL_COOLDOWN are the steps of a structured workout; RWD_RUN / RWD_WALK / RWD_STAND are run/walk detection.
+
+    joins:
+      - name: activities
+        sql: "{CUBE}.activity_id = {activities}.activity_id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: segment_key
+        sql: "activity_id || '-' || segment_type"
+        type: string
+        primary_key: true
+      - name: segment_type
+        sql: segment_type
+        type: string
+
+    measures:
+      - name: count
+        type: count
+      - name: total_distance_km
+        sql: distance_km
+        type: sum
+      - name: total_duration_minutes
+        sql: duration_minutes
+        type: sum
+      - name: pace_min_per_km
+        sql: "SUM({CUBE}.duration_minutes) / NULLIF(SUM({CUBE}.distance_km), 0)"
+        type: number
+        description: Pace over all matching segments (total time / total distance)

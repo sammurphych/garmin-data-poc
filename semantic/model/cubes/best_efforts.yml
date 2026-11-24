@@ -1,0 +1,35 @@
+cubes:
+  - name: best_efforts
+    sql_table: marts.fct_best_efforts
+    description: >
+      The fastest stretch of each standard distance (1 km, 1 mile, 5 km, 10 km, Half marathon, 30 km, Marathon)
+      inside each run, from the per-second recording. A long run also has efforts for every shorter distance.
+
+    joins:
+      - name: activities
+        sql: "{CUBE}.activity_id = {activities}.activity_id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: effort_key
+        sql: "activity_id || '-' || effort"
+        type: string
+        primary_key: true
+      - name: effort
+        sql: effort
+        type: string
+        description: "One of: 1 km, 1 mile, 5 km, 10 km, Half marathon, 30 km, Marathon"
+
+    measures:
+      - name: count
+        type: count
+      - name: best_time_min
+        sql: "best_seconds / 60.0"
+        type: min
+        description: Fastest time for the effort distance, in minutes. Filter or group by effort.
+      - name: avg_time_min
+        sql: "best_seconds / 60.0"
+        type: avg
+      - name: best_pace_min_per_km
+        sql: pace_min_per_km
+        type: min

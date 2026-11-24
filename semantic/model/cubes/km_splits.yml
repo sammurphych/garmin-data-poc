@@ -1,0 +1,48 @@
+cubes:
+  - name: km_splits
+    sql_table: marts.fct_activity_km_splits
+    description: One row per kilometre of each run, from the per-second recording. The last row of a run is usually a partial kilometre.
+
+    joins:
+      - name: activities
+        sql: "{CUBE}.activity_id = {activities}.activity_id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: split_key
+        sql: "activity_id || '-' || km"
+        type: string
+        primary_key: true
+      - name: km
+        sql: km
+        type: number
+        description: Kilometre number within the run (1 = first)
+      - name: is_full_km
+        sql: "split_km >= 0.99"
+        type: boolean
+        description: False for the partial kilometre at the end of a run
+
+    measures:
+      - name: count
+        type: count
+      - name: avg_pace_min_per_km
+        sql: "split_seconds / 60.0"
+        type: avg
+        description: Average split time in minutes (= pace for full kilometres)
+      - name: fastest_split_min
+        sql: "CASE WHEN split_km >= 0.99 THEN split_seconds / 60.0 END"
+        type: min
+        description: Fastest full-kilometre split, in minutes
+      - name: avg_gap_pace_min_per_km
+        sql: gap_pace_min_per_km
+        type: avg
+        description: Grade-adjusted pace (what the pace would be on the flat)
+      - name: avg_hr
+        sql: avg_hr
+        type: avg
+      - name: total_elevation_gain_m
+        sql: elevation_gain_m
+        type: sum
+      - name: avg_cadence_spm
+        sql: avg_cadence_spm
+        type: avg

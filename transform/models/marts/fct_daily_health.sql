@@ -35,8 +35,11 @@ SELECT
   s.sleep_score,
   h.hrv_last_night_avg,
   h.hrv_weekly_avg,
-  h.hrv_status
+  h.hrv_status,
+  v.running_vo2max,
+  v.cycling_vo2max
 FROM staging.stg_daily_summary AS d
 LEFT JOIN staging.stg_sleep AS s USING (calendar_date)
 LEFT JOIN staging.stg_hrv AS h USING (calendar_date)
+LEFT JOIN staging.stg_vo2max AS v USING (calendar_date)
 WHERE d.calendar_date BETWEEN @start_ds AND @end_ds

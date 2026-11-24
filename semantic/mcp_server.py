@@ -30,7 +30,9 @@ INSTRUCTIONS = (
     "Call describe_semantic_layer first, then query with the exact member names it returns. "
     "For individual workouts, include training.activity_id in dimensions: activity names "
     "repeat (e.g. two \"Austin Running\" on one day), so grouping by name or date alone "
-    "merges them into one row."
+    "merges them into one row. "
+    "Per-kilometre splits, best efforts inside runs (e.g. fastest 5 km ever, including within longer runs) and "
+    "workout segments (warm-up, main set, cool-down) are in the splits, efforts and segments views."
 )
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
