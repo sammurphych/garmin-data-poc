@@ -3,7 +3,7 @@
 # Playground: http://localhost:4000   SQL API (Postgres wire): localhost:15432
 services:
   cube:
-    image: cubejs/cube:latest   # pin to a specific version once it works
+    image: cubejs/cube:v1.8.21   # same version as semantic/Dockerfile (Render)
     ports:
       - "4000:4000"
       - "15432:15432"

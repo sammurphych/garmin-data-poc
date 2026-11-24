@@ -1,0 +1,38 @@
+cubes:
+  - name: weight
+    sql_table: marts.fct_weight_daily
+    description: One row per day with a Withings weigh-in; values are that day's last reading. Days without a weigh-in have no row.
+
+    joins:
+      - name: dates
+        sql: "{CUBE}.calendar_date = {dates}.calendar_date"
+        relationship: one_to_one
+
+    dimensions:
+      - name: calendar_date
+        sql: calendar_date
+        type: time
+        primary_key: true
+        public: true
+
+    measures:
+      - name: days_weighed
+        type: count
+        description: Number of days with a weigh-in
+      - name: avg_weight_kg
+        sql: weight_kg
+        type: avg
+        description: Average of daily weights (kg)
+      - name: min_weight_kg
+        sql: weight_kg
+        type: min
+      - name: max_weight_kg
+        sql: weight_kg
+        type: max
+      - name: avg_fat_ratio_pct
+        sql: fat_ratio_pct
+        type: avg
+        description: Average body fat % (only some weigh-ins measure it)
+      - name: avg_muscle_mass_kg
+        sql: muscle_mass_kg
+        type: avg

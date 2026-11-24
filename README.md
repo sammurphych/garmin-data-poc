@@ -17,7 +17,7 @@ Local
 | `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities`, `sleep`, `hrv`) and Withings (`measures`: weight and body composition) |
 | `transform/` | SQLMesh project (`config.py` picks the gateway: `local` or `motherduck`) |
 | `flows/garmin_daily.py` | Prefect flow; `prefect.yaml` is the deployment and schedule |
-| `semantic/` | Cube Core models and views, docker compose, MCP server |
+| `semantic/` | Cube Core models and views (`health`, `training`, `body`), Render Dockerfile, MCP server, local-model chat |
 | `dashboards/` | Evidence project; `netlify.toml` builds it on Netlify |
 
 ## Secrets
@@ -86,13 +86,11 @@ EVIDENCE_SOURCE__motherduck__token=<dashboards token> npm run sources && npm run
 ```
 On Netlify, choose *Add new site → Import from Git* and pick this repo; `netlify.toml` sets the build. Add env var `EVIDENCE_SOURCE__motherduck__token`. Under *Build hooks*, create a hook and save its URL as the Prefect Secret `evidence-build-hook`.
 
-**7. Cube and MCP:**
+**7. Cube on Render, and the MCP server.** Cube runs on Render's free tier from `render.yaml` and `semantic/Dockerfile` (it sleeps when idle, so the first query after a while takes 30-60 s). In Render choose *New → Blueprint*, pick this repo, and set the two secret env vars it asks for: `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN` (the dashboards token) and `CUBEJS_API_SECRET` (same value as in `.env`). Then set `CUBE_API_URL=https://<service>.onrender.com/cubejs-api/v1` in `.env` and register the MCP server with Claude Code:
 ```bash
-cd semantic && docker compose --env-file ../.env up -d   # Playground: http://localhost:4000
-psql "postgresql://cube:$CUBEJS_API_SECRET@localhost:15432/db" -c "select measure(avg_resting_hr) from health"
-cd .. && claude mcp add garmin-cube -- uv run --group mcp python semantic/mcp_server.py
+claude mcp add health-cube -- uv run --group mcp python semantic/mcp_server.py
 ```
-Then ask Claude: *"What was my average resting HR last week vs the 4 weeks before?"*
+Then ask Claude: *"What was my average resting HR last week vs the 4 weeks before?"* The views are `health` (Garmin daily wellness), `training` (activities) and `body` (Withings weight).
 
 **8. SQLMesh state in Postgres.** Create a free [Neon](https://neon.tech) project and copy its connection string into `.env` as `SQLMESH_STATE_DB_URL`. Move the existing state across, then store the URL for Prefect:
 ```bash
@@ -111,9 +109,16 @@ cd transform && uv run sqlmesh create_external_models && uv run sqlmesh plan
 ```
 Save `withings-client-id` and `withings-client-secret` as Prefect Secrets, then `prefect deploy --all`.
 
+**10. Local model (optional).** Ollama needs macOS 14+, so this uses [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server`, which has an OpenAI-compatible API with tool calling. Download the `bin-macos-x64` (Intel) or `bin-macos-arm64` build from its releases into `~/.local/llama.cpp/`, then:
+```bash
+~/.local/llama.cpp/llama-b12262/llama-server -hf unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M --jinja -c 8192 --port 8080
+uv run --group mcp python semantic/local_chat.py      # in another terminal
+```
+The first start downloads the model (~2.5 GB). `local_chat.py` gives the model the same Cube `query` tool the MCP server gives Claude, so the two can be compared on the same questions. On a CPU-only laptop expect tens of seconds per answer.
+
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).
 - Every run re-pulls the last 3 days, because Garmin revises recent days. The merge on natural keys keeps rows unique, and SQLMesh `lookback 3` reprocesses the same days.
 - SQLMesh state for the motherduck gateway is in Postgres when `SQLMESH_STATE_DB_URL` is set, and in MotherDuck otherwise.
 - Withings rotates its refresh token on every use, so the token lives only in the Prefect Secret `withings-refresh-token`. Laptop and cloud runs both read and update it there. Withings asks for at most one poll per user every 10 minutes.
-- Cube runs locally. To keep it online for free, deploy the same image to Render's free tier (it sleeps when idle).
+- Cube runs on Render's free tier and sleeps after ~15 minutes idle. Its API needs a JWT signed with `CUBEJS_API_SECRET`, which the MCP server creates per request.

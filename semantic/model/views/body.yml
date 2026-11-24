@@ -1,0 +1,11 @@
+views:
+  - name: body
+    description: Body weight and composition from Withings scales, one row per weigh-in day. Use calendar_date for time series. Weigh-ins are irregular, so check days_weighed.
+    cubes:
+      - join_path: weight
+        includes: "*"
+      - join_path: weight.dates
+        prefix: true
+        includes:
+          - day_name
+          - is_weekend

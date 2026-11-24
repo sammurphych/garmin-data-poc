@@ -1,12 +1,15 @@
-"""MCP server exposing the Cube semantic layer to Claude.
+"""MCP server exposing the Cube semantic layer (health, training, body views).
 
-Register with Claude Code (from the repo root, Cube running locally):
-    claude mcp add garmin-cube -- uv run --group mcp python semantic/mcp_server.py
+Register with Claude Code (from the repo root). CUBE_API_URL in .env points at Cube:
+    claude mcp add health-cube -- uv run --group mcp python semantic/mcp_server.py
+
+The same two functions back the local-model chat in semantic/local_chat.py.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -14,12 +17,17 @@ from pathlib import Path
 import httpx
 import jwt
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+logging.getLogger("httpx").setLevel(logging.WARNING)  # Cube long-polls; per-request logs are noise
 
 CUBE_API_URL = os.getenv("CUBE_API_URL", "http://localhost:4000/cubejs-api/v1")
-mcp = FastMCP("garmin-cube")
+mcp = MCPServer(
+    "health-cube",
+    instructions="Personal health data (Garmin wellness and workouts, Withings weight). "
+                 "Call describe_semantic_layer first, then query with the exact member names it returns.",
+)
 
 
 def _headers() -> dict:
@@ -29,9 +37,9 @@ def _headers() -> dict:
 
 @mcp.tool()
 def describe_semantic_layer() -> str:
-    """List the views (health, training) with their measures, dimensions and descriptions.
+    """List the views (health, training, body) with their measures, dimensions and descriptions.
     Call this first to learn which member names exist before calling `query`."""
-    meta = httpx.get(f"{CUBE_API_URL}/meta", headers=_headers(), timeout=30).raise_for_status().json()
+    meta = httpx.get(f"{CUBE_API_URL}/meta", headers=_headers(), timeout=120).raise_for_status().json()
     out = []
     for c in meta.get("cubes", []):
         if c.get("type") != "view":
@@ -80,8 +88,9 @@ def query(
         q["order"] = order
 
     # Cube answers "Continue wait" while a query is still being prepared.
+    # A Render instance waking from sleep can take ~60 s, hence the long timeout.
     for _ in range(30):
-        resp = httpx.post(f"{CUBE_API_URL}/load", headers=_headers(), json={"query": q}, timeout=60)
+        resp = httpx.post(f"{CUBE_API_URL}/load", headers=_headers(), json={"query": q}, timeout=120)
         body = resp.json()
         if body.get("error") == "Continue wait":
             time.sleep(1)

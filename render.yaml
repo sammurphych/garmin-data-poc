@@ -1,0 +1,20 @@
+# Render Blueprint: Cube Core (semantic layer) on Render's free web service.
+# It sleeps after ~15 min idle; the first request after that takes ~30-60 s to wake it.
+services:
+  - type: web
+    name: health-cube
+    runtime: docker
+    plan: free
+    dockerfilePath: ./semantic/Dockerfile
+    dockerContext: ./semantic
+    healthCheckPath: /readyz
+    buildFilter:
+      paths:
+        - semantic/**
+    envVars:
+      - key: CUBEJS_DB_DUCKDB_DATABASE_PATH
+        value: md:health
+      - key: CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN  # the dashboards token (MOTHERDUCK_READ_TOKEN)
+        sync: false
+      - key: CUBEJS_API_SECRET                  # same value as CUBEJS_API_SECRET in .env
+        sync: false
