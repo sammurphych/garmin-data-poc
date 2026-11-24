@@ -20,3 +20,35 @@ services:
         sync: false
       - key: CUBEJS_API_SECRET                  # same value as CUBEJS_API_SECRET in .env
         sync: false
+
+  # The MCP server for claude.ai (semantic/mcp_remote.py), behind a one-person OAuth sign-in.
+  # Render generates the three secrets; copy the client id/secret into claude.ai and the password into
+  # your password manager. Regenerating MCP_SIGNING_KEY signs claude.ai out (revokes every token).
+  - type: web
+    name: health-mcp
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen --only-group mcp
+    startCommand: uv run --no-sync python semantic/mcp_remote.py
+    healthCheckPath: /healthz
+    buildFilter:
+      paths:
+        - semantic/mcp_server.py
+        - semantic/mcp_remote.py
+        - pyproject.toml
+        - uv.lock
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: CUBE_API_URL                       # https://<health-cube service>.onrender.com/cubejs-api/v1
+        sync: false
+      - key: CUBEJS_API_SECRET                  # same value as on the health-cube service
+        sync: false
+      - key: MCP_OAUTH_CLIENT_ID
+        generateValue: true
+      - key: MCP_OAUTH_CLIENT_SECRET
+        generateValue: true
+      - key: MCP_LOGIN_PASSWORD
+        generateValue: true
+      - key: MCP_SIGNING_KEY
+        generateValue: true

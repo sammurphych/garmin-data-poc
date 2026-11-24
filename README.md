@@ -8,8 +8,9 @@ Prefect Cloud  (cron 06:00 UTC, Prefect Managed work pool, code cloned from git)
        1. extract_load  dlt: Garmin Personal API → MotherDuck  health.raw_garmin.*
        2. transform     SQLMesh run: staging.* views → marts.* tables (+ audits)
        3. refresh_bi    POST Netlify build hook → Evidence site rebuilds from MotherDuck
-Render (free web service, Docker image from semantic/Dockerfile)
-  └─ Cube Core over health.marts → REST API
+Render (free web services)
+  ├─ health-cube: Cube Core over health.marts → REST API (Docker image from semantic/Dockerfile)
+  └─ health-mcp:  MCP server over HTTPS, OAuth sign-in → claude.ai custom connector
 Local
   MCP server (semantic/mcp_server.py) → Claude Code; local_chat.py → llama.cpp
 ```
@@ -113,6 +114,21 @@ Save `withings-client-id` and `withings-client-secret` as Prefect Secrets, then 
 uv run --group mcp python semantic/local_chat.py      # in another terminal
 ```
 The first start downloads the model (~2.5 GB). `local_chat.py` gives the model the same Cube `query` tool the MCP server gives Claude, so the two can be compared on the same questions. On a CPU-only laptop expect tens of seconds per answer.
+
+**11. claude.ai (browser and app).** `render.yaml` also defines `health-mcp`, which runs `semantic/mcp_remote.py`: the same two read-only tools over HTTPS, behind a sign-in only you can pass. In Render, open the Blueprint and *Sync* it so the new service is created. Set `CUBE_API_URL` and `CUBEJS_API_SECRET` to the same values as in `.env`. Render generates the other four values. Then in claude.ai (use a personal account; a work account's admins control connectors and can see chats) go to *Settings → Connectors → Add custom connector*:
+- **URL:** `https://<health-mcp service>.onrender.com/mcp`
+- **Advanced settings:** OAuth Client ID = `MCP_OAUTH_CLIENT_ID`, OAuth Client Secret = `MCP_OAUTH_CLIENT_SECRET` (both from the service's *Environment* page)
+
+Click *Connect*. A health-cube page asks for a password: paste `MCP_LOGIN_PASSWORD`, keeping it in a password manager. claude.ai stays signed in for up to 30 days of use.
+
+How it is locked down:
+- **One client.** claude.ai is the only OAuth client, and dynamic client registration is off, so nobody else can register one.
+- **Redirects.** Sign-in can only send you back to claude.ai's callback.
+- **Two secrets.** Getting a token needs both the password and the client secret.
+- **Wrong passwords.** After 5 wrong passwords in 15 minutes, sign-in locks for 15 minutes.
+- **Tokens.** Access tokens last an hour and only work on this server's `/mcp` address. Refresh tokens rotate and can't be reused.
+- **Read-only.** The server holds `CUBEJS_API_SECRET`, never the MotherDuck token. Its logs record sign-ins and the queries asked, never the data returned.
+- **Sign out everywhere.** Regenerate `MCP_SIGNING_KEY` in Render. That ends every token; reconnect the connector afterwards.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).

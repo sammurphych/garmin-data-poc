@@ -1,8 +1,8 @@
 """MCP server exposing the Cube semantic layer (health, training, body views).
 
-Registered for Claude Code by .mcp.json at the repo root; CUBE_API_URL in .env points at Cube.
-
-The same two functions back the local-model chat in semantic/local_chat.py.
+Run directly, it serves Claude Code over stdio: .mcp.json at the repo root registers it, and CUBE_API_URL in .env
+points at Cube. semantic/mcp_remote.py serves the same tools over HTTPS for claude.ai, and semantic/local_chat.py
+calls the two functions directly.
 """
 
 from __future__ import annotations
@@ -12,24 +12,27 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import httpx
 import jwt
 from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # Cube long-polls; per-request logs are noise
+log = logging.getLogger("health-cube")
 
 CUBE_API_URL = os.getenv("CUBE_API_URL", "http://localhost:4000/cubejs-api/v1")
-mcp = MCPServer(
-    "health-cube",
-    instructions="Personal health data (Garmin wellness and workouts, Withings weight). "
-                 "Call describe_semantic_layer first, then query with the exact member names it returns. "
-                 "For individual workouts, include training.activity_id in dimensions: activity names "
-                 "repeat (e.g. two \"Austin Running\" on one day), so grouping by name or date alone "
-                 "merges them into one row.",
+INSTRUCTIONS = (
+    "Personal health data (Garmin wellness and workouts, Withings weight). "
+    "Call describe_semantic_layer first, then query with the exact member names it returns. "
+    "For individual workouts, include training.activity_id in dimensions: activity names "
+    "repeat (e.g. two \"Austin Running\" on one day), so grouping by name or date alone "
+    "merges them into one row."
 )
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
 
 def _headers() -> dict:
@@ -37,7 +40,6 @@ def _headers() -> dict:
     return {"Authorization": token, "Content-Type": "application/json"}
 
 
-@mcp.tool()
 def describe_semantic_layer() -> str:
     """List the views (health, training, body) with their measures, dimensions and descriptions.
     Call this first to learn which member names exist before calling `query`."""
@@ -56,7 +58,6 @@ def describe_semantic_layer() -> str:
     return json.dumps(out, indent=2)
 
 
-@mcp.tool()
 def query(
     measures: list[str],
     dimensions: list[str] | None = None,
@@ -78,7 +79,7 @@ def query(
     - one row per workout: add `training.activity_id` to dimensions, or same-day workouts with
       the same name are merged into one row
     """
-    q: dict = {"measures": measures, "dimensions": dimensions or [], "limit": limit}
+    q: dict[str, Any] = {"measures": measures, "dimensions": dimensions or [], "limit": limit}
     if time_dimension:
         td: dict = {"dimension": time_dimension}
         if granularity:
@@ -90,6 +91,7 @@ def query(
         q["filters"] = filters
     if order:
         q["order"] = order
+    log.info("query %s", json.dumps(q))  # the question, never the rows that come back
 
     # Cube answers "Continue wait" while a query is still being prepared.
     # A Render instance waking from sleep can take ~60 s, hence the long timeout.
@@ -105,5 +107,13 @@ def query(
     return json.dumps({"error": "Cube query timed out", "query": q})
 
 
+def build_server(**kwargs: Any) -> MCPServer:
+    """The health-cube server with both read-only tools; kwargs (e.g. auth settings) go to MCPServer."""
+    server = MCPServer("health-cube", instructions=INSTRUCTIONS, **kwargs)
+    for tool in (describe_semantic_layer, query):
+        server.add_tool(tool, annotations=READ_ONLY)
+    return server
+
+
 if __name__ == "__main__":
-    mcp.run()
+    build_server().run()
