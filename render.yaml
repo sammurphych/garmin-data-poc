@@ -16,5 +16,7 @@ services:
         value: md:health
       - key: CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN  # the dashboards token (MOTHERDUCK_READ_TOKEN)
         sync: false
+      - key: motherduck_token                   # same token again; the MotherDuck extension reads this name itself
+        sync: false
       - key: CUBEJS_API_SECRET                  # same value as CUBEJS_API_SECRET in .env
         sync: false
