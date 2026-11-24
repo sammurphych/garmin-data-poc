@@ -8,8 +8,10 @@ Prefect Cloud  (cron 06:00 UTC, Prefect Managed work pool, code cloned from git)
        1. extract_load  dlt: Garmin Personal API → MotherDuck  health.raw_garmin.*
        2. transform     SQLMesh run: staging.* views → marts.* tables (+ audits)
        3. refresh_bi    POST Netlify build hook → Evidence site rebuilds from MotherDuck
+Render (free web service, Docker image from semantic/Dockerfile)
+  └─ Cube Core over health.marts → REST API
 Local
-  Cube Core (docker) over health.marts → REST/SQL API → MCP server → Claude
+  MCP server (semantic/mcp_server.py) → Claude Code; local_chat.py → llama.cpp
 ```
 
 | Path | What it does |
@@ -36,7 +38,7 @@ Local
 
 ## Setup
 
-**0. Tools.** Install `uv` (`brew install uv`), Node 20+ (`brew install node`) and Docker (Docker Desktop or `brew install colima docker docker-compose`). Then:
+**0. Tools.** Install `uv` (`brew install uv`) and Node 20+ (`brew install node`, needed for Evidence). Docker isn't needed locally, because Render builds the Cube image. Then:
 ```bash
 cp .env.example .env      # fill in GARMIN_API_KEY
 uv sync --all-groups

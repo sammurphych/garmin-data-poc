@@ -25,7 +25,10 @@ CUBE_API_URL = os.getenv("CUBE_API_URL", "http://localhost:4000/cubejs-api/v1")
 mcp = MCPServer(
     "health-cube",
     instructions="Personal health data (Garmin wellness and workouts, Withings weight). "
-                 "Call describe_semantic_layer first, then query with the exact member names it returns.",
+                 "Call describe_semantic_layer first, then query with the exact member names it returns. "
+                 "For individual workouts, include training.activity_id in dimensions: activity names "
+                 "repeat (e.g. two \"Austin Running\" on one day), so grouping by name or date alone "
+                 "merges them into one row.",
 )
 
 
@@ -72,6 +75,8 @@ def query(
     - date_range: ["2026-10-01", "2026-10-31"] or a phrase like "last 7 days", "this month"
     - filters: Cube filters, e.g. [{"member": "training.activity_type", "operator": "equals", "values": ["running"]}]
     - order: e.g. {"health.calendar_date": "asc"}
+    - one row per workout: add `training.activity_id` to dimensions, or same-day workouts with
+      the same name are merged into one row
     """
     q: dict = {"measures": measures, "dimensions": dimensions or [], "limit": limit}
     if time_dimension:
