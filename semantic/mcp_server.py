@@ -33,7 +33,7 @@ INSTRUCTIONS = (
     "merges them into one row. "
     "Per-kilometre splits, best efforts inside runs (e.g. fastest 5 km ever, including within longer runs) and "
     "workout segments (warm-up, main set, cool-down) are in the splits, efforts and segments views. "
-    "The weather during each outdoor activity (temperature, conditions, humidity, dew point, rain, wind) is in training."
+    "The weather during each outdoor activity (temperature, feels-like, humidity, wind) is in training."
 )
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 

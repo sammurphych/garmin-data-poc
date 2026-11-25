@@ -140,7 +140,7 @@ cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WA
 ```
 Render redeploys Cube from the push. The Personal API has no splits, laps, heart-rate zones or weather endpoints, so splits and best efforts are calculated from the recordings; for 2025 onwards they match Garmin's own `fastest_split_*` figures to 0.1 s.
 
-**13. Weather.** `ingest/weather_source.py` loads hourly weather from [Open-Meteo](https://open-meteo.com)'s historical API (free for non-commercial use, no key) for the area each activity started in. Open-Meteo only receives the start point rounded to 0.1° (about 11 km), never the route. `marts.fct_activity_weather` has the temperature, feels-like, conditions, humidity, dew point, rain and wind for each activity, and Cube adds them to the `training` view. Treadmill and gym sessions have no start point, so no weather. The full history is about 500 calls, well within Open-Meteo's 10,000 a day:
+**13. Weather.** `ingest/weather_source.py` loads hourly weather from [Open-Meteo](https://open-meteo.com)'s historical API (free for non-commercial use, no key) for the area each activity started in. Open-Meteo only receives the start point rounded to 0.1° (about 11 km), never the route. `marts.fct_activity_weather` has the temperature, feels-like temperature, humidity and wind for each activity, and Cube adds them to the `training` view. Treadmill and gym sessions have no start point, so no weather. The full history is about 500 calls, well within Open-Meteo's 10,000 a day:
 ```bash
 WAREHOUSE=motherduck uv run python -m ingest.pipeline weather
 cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WAREHOUSE=motherduck uv run sqlmesh plan

@@ -20,11 +20,7 @@ import dlt
 from dlt.sources.helpers import requests
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-# At most 10 variables, or Open-Meteo counts a request as more than one call.
-HOURLY = [
-    "temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m",
-    "precipitation", "weather_code", "cloud_cover", "wind_speed_10m", "wind_gusts_10m",
-]
+HOURLY = ["temperature_2m", "apparent_temperature", "relative_humidity_2m", "wind_speed_10m"]
 MAX_WINDOW_DAYS = 14
 REVISED_DAYS = 7  # Open-Meteo's recent days are provisional for about this long
 REQUEST_PAUSE_S = 0.2  # Open-Meteo allows 600 calls a minute
