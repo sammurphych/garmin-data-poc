@@ -747,6 +747,26 @@
     _dlt_load_id: TEXT
     _dlt_id: TEXT
   gateway: motherduck
+- name: '"health"."raw_weather"."activity_areas"'
+  columns:
+    activity_id: BIGINT
+    latitude: DOUBLE
+    longitude: DOUBLE
+    _dlt_load_id: TEXT
+    _dlt_id: TEXT
+  gateway: motherduck
+- name: '"health"."raw_weather"."hourly"'
+  columns:
+    temperature_2m: DOUBLE
+    apparent_temperature: DOUBLE
+    relative_humidity_2m: DOUBLE
+    wind_speed_10m: DOUBLE
+    time_utc: TIMESTAMPTZ
+    latitude: DOUBLE
+    longitude: DOUBLE
+    _dlt_load_id: TEXT
+    _dlt_id: TEXT
+  gateway: motherduck
 - name: '"health"."raw_withings"."measures"'
   columns:
     weight_kg: DOUBLE
