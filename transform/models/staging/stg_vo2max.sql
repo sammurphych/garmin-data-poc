@@ -6,7 +6,7 @@ MODEL (
 );
 
 SELECT
-  CAST(calendar_date AS DATE)  AS calendar_date,
+  CAST(calendar_date AS DATE) AS calendar_date,
   running_vo2max,
   cycling_vo2max
 FROM raw_garmin.vo2max

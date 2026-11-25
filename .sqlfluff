@@ -1,0 +1,20 @@
+# SQLFluff rules for the SQLMesh models; run with: uv run python transform/lint_sql.py
+[sqlfluff]
+dialect = duckdb
+templater = raw
+max_line_length = 120
+# ST06 reorders columns (changes the tables), ST07 bans USING joins (idiomatic in DuckDB and used throughout),
+# RF04 objects to column names like `year`.
+exclude_rules = ST06, ST07, RF04
+
+[sqlfluff:indentation]
+tab_space_size = 2
+indented_joins = false
+indented_using_on = true
+implicit_indents = allow
+
+# Column aliases may be lined up in a column (`expr    AS name`).
+[sqlfluff:layout:type:alias_expression]
+spacing_before = align
+align_within = select_clause
+align_scope = bracketed

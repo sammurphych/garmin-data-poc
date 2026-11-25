@@ -16,7 +16,7 @@ SELECT
   segment_count,
   distance_km,
   duration_minutes,
-  CASE WHEN distance_km > 0 THEN duration_minutes / distance_km END  AS pace_min_per_km,
+  CASE WHEN distance_km > 0 THEN duration_minutes / distance_km END AS pace_min_per_km,
   avg_speed_mps,
   max_speed_mps,
   elevation_gain_m,

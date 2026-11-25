@@ -10,9 +10,9 @@ MODEL (
 SELECT
   latitude,
   longitude,
-  CAST(time_utc AS TIMESTAMP)        AS time_utc,
-  temperature_2m                     AS temperature_c,
-  apparent_temperature               AS feels_like_c,   -- with wind chill and humidity
-  relative_humidity_2m               AS humidity_pct,
-  wind_speed_10m                     AS wind_speed_kmh
+  CAST(time_utc AS TIMESTAMP) AS time_utc,
+  temperature_2m              AS temperature_c,
+  apparent_temperature        AS feels_like_c,   -- with wind chill and humidity
+  relative_humidity_2m        AS humidity_pct,
+  wind_speed_10m              AS wind_speed_kmh
 FROM raw_weather.hourly

@@ -13,7 +13,7 @@ MODEL (
 SELECT
   grpid,
   measured_at,
-  COALESCE(timezone, 'UTC')                                         AS timezone,
+  COALESCE(timezone, 'UTC')                                        AS timezone,
   CAST(measured_at AT TIME ZONE COALESCE(timezone, 'UTC') AS DATE) AS measured_date,
   weight_kg,
   fat_ratio_pct,
@@ -22,5 +22,5 @@ SELECT
   muscle_mass_kg,
   bone_mass_kg,
   hydration_kg,
-  deviceid                                                          AS device_id
+  deviceid                                                         AS device_id
 FROM raw_withings.measures

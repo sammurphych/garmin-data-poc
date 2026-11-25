@@ -25,7 +25,8 @@ SELECT
   moving_minutes,
   elevation_gain_m,
   CASE WHEN distance_km > 0 AND activity_type ILIKE '%running%'
-       THEN moving_minutes / distance_km END AS pace_min_per_km,
+      THEN moving_minutes / distance_km
+  END AS pace_min_per_km,
   avg_hr,
   max_hr,
   calories,

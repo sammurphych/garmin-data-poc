@@ -14,6 +14,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "sqlfluff>=3.4",
     "sqlmesh[lsp]>=0.236.4",
 ]
 mcp = [  # also everything the health-mcp Render service installs (uv sync --only-group mcp)

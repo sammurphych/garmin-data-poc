@@ -7,15 +7,15 @@ MODEL (
 );
 
 SELECT
-  CAST(d AS DATE)                    AS calendar_date,
-  CAST(date_trunc('week', d) AS DATE)  AS week_start,
-  CAST(date_trunc('month', d) AS DATE) AS month_start,
-  year(d)                            AS year,
-  isodow(d)                          AS iso_day_of_week,
-  dayname(d)                         AS day_name,
-  isodow(d) IN (6, 7)                AS is_weekend
-FROM generate_series(
-  (SELECT CAST(min(calendar_date) AS TIMESTAMP) FROM staging.stg_daily_summary),
-  CAST(current_date AS TIMESTAMP),
-  INTERVAL 1 DAY
-) AS t(d)
+  CAST(d AS DATE)                      AS calendar_date,
+  CAST(DATE_TRUNC('week', d) AS DATE)  AS week_start,
+  CAST(DATE_TRUNC('month', d) AS DATE) AS month_start,
+  YEAR(d)                              AS year,
+  ISODOW(d)                            AS iso_day_of_week,
+  DAYNAME(d)                           AS day_name,
+  ISODOW(d) IN (6, 7)                  AS is_weekend
+FROM GENERATE_SERIES(
+    (SELECT CAST(MIN(calendar_date) AS TIMESTAMP) FROM staging.stg_daily_summary),
+    CAST(CURRENT_DATE AS TIMESTAMP),
+    INTERVAL 1 DAY
+  ) AS t (d)

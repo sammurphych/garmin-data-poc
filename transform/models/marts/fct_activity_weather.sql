@@ -18,8 +18,10 @@ WITH activities AS (
     w.latitude,
     w.longitude
   FROM staging.stg_activities AS a
-  JOIN staging.stg_activity_weather_areas AS w ON w.activity_id = a.activity_id
-), hours AS (
+  INNER JOIN staging.stg_activity_weather_areas AS w ON a.activity_id = w.activity_id
+),
+
+hours AS (
   SELECT
     a.activity_id,
     h.time_utc = DATE_TRUNC('hour', a.start_time_utc) AS is_start_hour,
@@ -28,17 +30,18 @@ WITH activities AS (
     h.humidity_pct,
     h.wind_speed_kmh
   FROM activities AS a
-  JOIN staging.stg_weather_hourly AS h
-    ON h.latitude = a.latitude AND h.longitude = a.longitude
-    AND h.time_utc BETWEEN DATE_TRUNC('hour', a.start_time_utc) AND a.end_time_utc
+  INNER JOIN staging.stg_weather_hourly AS h
+    ON a.latitude = h.latitude AND a.longitude = h.longitude
+      AND h.time_utc BETWEEN DATE_TRUNC('hour', a.start_time_utc) AND a.end_time_utc
 )
+
 SELECT
   activity_id,
-  ANY_VALUE(temperature_c) FILTER (WHERE is_start_hour)    AS start_temperature_c,
-  ANY_VALUE(feels_like_c) FILTER (WHERE is_start_hour)     AS start_feels_like_c,
-  AVG(temperature_c)                                       AS avg_temperature_c,
-  AVG(feels_like_c)                                        AS avg_feels_like_c,
-  AVG(humidity_pct)                                        AS avg_humidity_pct,
-  AVG(wind_speed_kmh)                                      AS avg_wind_speed_kmh
+  ANY_VALUE(temperature_c) FILTER (WHERE is_start_hour) AS start_temperature_c,
+  ANY_VALUE(feels_like_c) FILTER (WHERE is_start_hour)  AS start_feels_like_c,
+  AVG(temperature_c)                                    AS avg_temperature_c,
+  AVG(feels_like_c)                                     AS avg_feels_like_c,
+  AVG(humidity_pct)                                     AS avg_humidity_pct,
+  AVG(wind_speed_kmh)                                   AS avg_wind_speed_kmh
 FROM hours
 GROUP BY activity_id

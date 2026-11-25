@@ -13,18 +13,19 @@ MODEL (
 -- average covers the calendar week ending that day, so gaps between weigh-ins don't stretch it.
 WITH daily AS (
   SELECT
-    measured_date                                                                       AS calendar_date,
-    ARG_MAX(weight_kg, measured_at) FILTER (WHERE weight_kg IS NOT NULL)               AS weight_kg,
-    MIN(weight_kg)                                                                      AS weight_kg_min,
-    ARG_MAX(fat_ratio_pct, measured_at) FILTER (WHERE fat_ratio_pct IS NOT NULL)       AS fat_ratio_pct,
-    ARG_MAX(fat_mass_kg, measured_at) FILTER (WHERE fat_mass_kg IS NOT NULL)           AS fat_mass_kg,
-    ARG_MAX(muscle_mass_kg, measured_at) FILTER (WHERE muscle_mass_kg IS NOT NULL)     AS muscle_mass_kg,
-    ARG_MAX(bone_mass_kg, measured_at) FILTER (WHERE bone_mass_kg IS NOT NULL)         AS bone_mass_kg,
-    ARG_MAX(hydration_kg, measured_at) FILTER (WHERE hydration_kg IS NOT NULL)         AS hydration_kg,
-    COUNT(*)                                                                            AS weigh_ins
+    measured_date                                                                  AS calendar_date,
+    ARG_MAX(weight_kg, measured_at) FILTER (WHERE weight_kg IS NOT NULL)           AS weight_kg,
+    MIN(weight_kg)                                                                 AS weight_kg_min,
+    ARG_MAX(fat_ratio_pct, measured_at) FILTER (WHERE fat_ratio_pct IS NOT NULL)   AS fat_ratio_pct,
+    ARG_MAX(fat_mass_kg, measured_at) FILTER (WHERE fat_mass_kg IS NOT NULL)       AS fat_mass_kg,
+    ARG_MAX(muscle_mass_kg, measured_at) FILTER (WHERE muscle_mass_kg IS NOT NULL) AS muscle_mass_kg,
+    ARG_MAX(bone_mass_kg, measured_at) FILTER (WHERE bone_mass_kg IS NOT NULL)     AS bone_mass_kg,
+    ARG_MAX(hydration_kg, measured_at) FILTER (WHERE hydration_kg IS NOT NULL)     AS hydration_kg,
+    COUNT(*)                                                                       AS weigh_ins
   FROM staging.stg_withings_measures
   GROUP BY measured_date
 )
+
 SELECT
   calendar_date,
   weight_kg,

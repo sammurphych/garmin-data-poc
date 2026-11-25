@@ -147,7 +147,9 @@ cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WA
 ```
 After that the daily Prefect run fetches weather for new activities, and fetches the last week again because Open-Meteo revises recent days.
 
-**SQL linting.** SQLMesh's linter runs on every `sqlmesh plan`, and on its own with `cd transform && uv run sqlmesh lint`. Ambiguous or unknown columns, `SELECT *`, unregistered raw tables and unnamed columns stop the plan; a model without audits is a warning. The rules are in `transform/config.py`. SQLFluff isn't used because it can't parse SQLMesh's `MODEL (...)` header or macros, and `sqlmesh format` isn't used because it rewrites comments.
+**SQL linting.** Two linters, for different things:
+- **SQLMesh's linter** checks correctness against the real tables. It runs on every `sqlmesh plan`, and on its own with `cd transform && uv run sqlmesh lint`. Ambiguous or unknown columns, `SELECT *`, unregistered raw tables and unnamed columns stop the plan; a model without audits is a warning. The rules are in `transform/config.py`.
+- **SQLFluff** checks style: layout, capitalisation, aliases, join style. Run `uv run python transform/lint_sql.py` to report problems, or add `--fix` to fix what it can. SQLFluff can't parse SQLMesh's `MODEL (...)` header or `@macros`, so the script hides them while SQLFluff runs and puts them back after a fix, so don't run `sqlfluff` directly. The rules are in `.sqlfluff`. Check a fix before committing it: AL05 once deleted an alias that named a `VALUES` list's columns.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).

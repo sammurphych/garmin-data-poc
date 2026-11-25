@@ -7,13 +7,13 @@ MODEL (
 );
 
 SELECT
-  CAST(date_trunc('week', activity_date) AS DATE) AS week_start,
+  CAST(DATE_TRUNC('week', activity_date) AS DATE) AS week_start,
   activity_type,
-  count(*)                       AS activity_count,
-  round(sum(distance_km), 2)     AS distance_km,
-  round(sum(moving_minutes), 1)  AS moving_minutes,
-  round(sum(elevation_gain_m))   AS elevation_gain_m,
-  round(sum(training_load), 1)   AS training_load,
-  round(avg(avg_hr), 1)          AS avg_hr
+  COUNT(*)                                        AS activity_count,
+  ROUND(SUM(distance_km), 2)                      AS distance_km,
+  ROUND(SUM(moving_minutes), 1)                   AS moving_minutes,
+  ROUND(SUM(elevation_gain_m))                    AS elevation_gain_m,
+  ROUND(SUM(training_load), 1)                    AS training_load,
+  ROUND(AVG(avg_hr), 1)                           AS avg_hr
 FROM marts.fct_activities
 GROUP BY ALL
