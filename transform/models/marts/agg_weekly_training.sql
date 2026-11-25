@@ -2,7 +2,8 @@ MODEL (
   name marts.agg_weekly_training,
   kind FULL,
   cron '@daily',
-  grain (week_start, activity_type)
+  grain (week_start, activity_type),
+  audits (unique_combination_of_columns(columns := (week_start, activity_type)))
 );
 
 SELECT

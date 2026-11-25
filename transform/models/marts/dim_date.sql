@@ -2,7 +2,8 @@ MODEL (
   name marts.dim_date,
   kind FULL,
   cron '@daily',
-  grain calendar_date
+  grain calendar_date,
+  audits (unique_values(columns := (calendar_date)), not_null(columns := (calendar_date)))
 );
 
 SELECT

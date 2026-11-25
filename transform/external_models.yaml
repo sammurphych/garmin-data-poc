@@ -470,6 +470,77 @@
     power_time_in_zone_5: DOUBLE
     avg_elevation: DOUBLE
   gateway: motherduck
+- name: '"health"."raw_garmin"."activities__split_summaries"'
+  columns:
+    total_ascent: DOUBLE
+    duration: DOUBLE
+    split_type: TEXT
+    num_climb_sends: BIGINT
+    distance: DOUBLE
+    average_speed: DOUBLE
+    max_speed: DOUBLE
+    num_falls: BIGINT
+    _dlt_root_id: TEXT
+    _dlt_parent_id: TEXT
+    _dlt_list_idx: BIGINT
+    _dlt_id: TEXT
+    max_elevation_gain: DOUBLE
+    average_elevation_gain: DOUBLE
+    max_distance: BIGINT
+    no_of_splits: BIGINT
+    elevation_loss: DOUBLE
+    max_distance_with_precision: DOUBLE
+    avg_step_frequency: DOUBLE
+    avg_step_length: DOUBLE
+    vertical_ratio: DOUBLE
+    vertical_oscillation: DOUBLE
+    avg_ground_contact_time: DOUBLE
+  gateway: motherduck
+- name: '"health"."raw_garmin"."activity_samples"'
+  columns:
+    activity_id: BIGINT
+    sample_index: BIGINT
+    direct_timestamp: DOUBLE
+    sum_duration: DOUBLE
+    direct_elevation: DOUBLE
+    sum_moving_duration: DOUBLE
+    sum_elapsed_duration: DOUBLE
+    _dlt_load_id: TEXT
+    _dlt_id: TEXT
+    direct_vertical_speed: DOUBLE
+    sum_distance: DOUBLE
+    direct_speed: DOUBLE
+    direct_swim_cadence: DOUBLE
+    direct_run_cadence: DOUBLE
+    direct_corrected_elevation: DOUBLE
+    direct_heart_rate: DOUBLE
+    direct_uncorrected_elevation: DOUBLE
+    direct_double_cadence: DOUBLE
+    direct_fractional_cadence: DOUBLE
+    direct_performance_condition: DOUBLE
+    direct_air_temperature: DOUBLE
+    direct_bike_cadence: DOUBLE
+    sum_accumulated_power: DOUBLE
+    connect_iq_developer_field_01: DOUBLE
+    connect_iq_developer_field_02: DOUBLE
+    connect_iq_developer_field_03: DOUBLE
+    connect_iq_developer_field_04: DOUBLE
+    connect_iq_developer_field_05: DOUBLE
+    connect_iq_developer_field_06: DOUBLE
+    connect_iq_developer_field00: DOUBLE
+    connect_iq_developer_field_12: DOUBLE
+    direct_respiration_rate: DOUBLE
+    direct_current_stress: DOUBLE
+    direct_body_battery: DOUBLE
+    direct_power: DOUBLE
+    direct_available_stamina: DOUBLE
+    direct_potential_stamina: DOUBLE
+    direct_grade_adjusted_speed: DOUBLE
+    direct_stride_length: DOUBLE
+    direct_vertical_oscillation: DOUBLE
+    direct_vertical_ratio: DOUBLE
+    direct_ground_contact_time: DOUBLE
+  gateway: motherduck
 - name: '"health"."raw_garmin"."daily_summaries"'
   columns:
     uuid: TEXT
@@ -667,6 +738,14 @@
     sleep_need__preferred_activity_tracker: BOOLEAN
     sleep_score_personalized_insight: TEXT
     avg_heart_rate: DOUBLE
+  gateway: motherduck
+- name: '"health"."raw_garmin"."vo2max"'
+  columns:
+    running_vo2max: DOUBLE
+    cycling_vo2max: DOUBLE
+    calendar_date: TEXT
+    _dlt_load_id: TEXT
+    _dlt_id: TEXT
   gateway: motherduck
 - name: '"health"."raw_withings"."measures"'
   columns:

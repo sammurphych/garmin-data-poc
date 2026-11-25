@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from dotenv import load_dotenv
-from sqlmesh.core.config import Config, GatewayConfig, ModelDefaultsConfig
+from sqlmesh.core.config import Config, GatewayConfig, LinterConfig, ModelDefaultsConfig
 from sqlmesh.core.config.connection import (
     DuckDBConnectionConfig,
     MotherDuckConnectionConfig,
@@ -53,4 +53,17 @@ config = Config(
     gateways=gateways,
     default_gateway=os.getenv("WAREHOUSE", "local"),
     model_defaults=ModelDefaultsConfig(dialect="duckdb", start=os.getenv("GARMIN_START_DATE", "2009-12-01")),
+    # Runs on every `sqlmesh plan` (errors stop it) and on its own with `sqlmesh lint`.
+    # Unit tests aren't required: the audits on each model check the data instead.
+    linter=LinterConfig(
+        enabled=True,
+        rules=[
+            "ambiguousorinvalidcolumn",
+            "invalidselectstarexpansion",
+            "noambiguousprojections",
+            "nomissingexternalmodels",
+            "noselectstar",
+        ],
+        warn_rules=["nomissingaudits"],
+    ),
 )

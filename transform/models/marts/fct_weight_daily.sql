@@ -26,7 +26,15 @@ WITH daily AS (
   GROUP BY measured_date
 )
 SELECT
-  *,
+  calendar_date,
+  weight_kg,
+  weight_kg_min,
+  fat_ratio_pct,
+  fat_mass_kg,
+  muscle_mass_kg,
+  bone_mass_kg,
+  hydration_kg,
+  weigh_ins,
   AVG(weight_kg) OVER (
     ORDER BY calendar_date RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW
   ) AS weight_kg_7d_avg
