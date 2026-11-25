@@ -15,16 +15,33 @@ MODEL (
 -- The fastest stretch of each standard distance inside each run (so a half marathon also yields a best
 -- 5 km and 10 km), from the per-second samples. For every sample, an ASOF join finds the first later
 -- sample at least that distance further on, and the time between them is scaled to the exact distance.
-WITH runs AS (
-  SELECT activity_id, activity_date, distance_km
+--
+-- Rides and drives recorded as runs are left out, or they'd hold every record:
+-- - since 2018 the watch records cadence, and a real run's median while moving is 150+ steps a minute
+-- - earlier watches recorded none, and the activities averaging faster than 3:50/km over 8 km or more
+--   were bike commutes (checked with the owner)
+WITH recorded_runs AS (
+  SELECT activity_id, activity_date, distance_km, duration_minutes
   FROM staging.stg_activities
   WHERE activity_type ILIKE '%running%'
     AND activity_date BETWEEN @start_ds AND @end_ds
 ), samples AS (
-  SELECT s.activity_id, s.timer_s, s.distance_m
+  SELECT s.activity_id, s.timer_s, s.distance_m, s.cadence_spm, s.speed_mps
   FROM staging.stg_activity_samples AS s
-  JOIN runs USING (activity_id)
+  JOIN recorded_runs USING (activity_id)
   WHERE s.distance_m IS NOT NULL AND s.timer_s IS NOT NULL
+), moving_cadence AS (
+  SELECT activity_id, MEDIAN(cadence_spm) FILTER (WHERE speed_mps > 1) AS median_cadence_spm
+  FROM samples
+  GROUP BY activity_id
+), runs AS (
+  SELECT r.activity_id, r.activity_date, r.distance_km
+  FROM recorded_runs AS r
+  LEFT JOIN moving_cadence AS c USING (activity_id)
+  WHERE CASE
+    WHEN c.median_cadence_spm IS NOT NULL THEN c.median_cadence_spm >= 130
+    ELSE NOT (r.distance_km >= 8 AND r.duration_minutes / r.distance_km < 3.83)
+  END
 ), targets AS (
   SELECT * FROM (VALUES
     ('1 km', 1000.0), ('1 mile', 1609.344), ('5 km', 5000.0), ('10 km', 10000.0),
