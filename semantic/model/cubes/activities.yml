@@ -7,6 +7,9 @@ cubes:
       - name: dates
         sql: "{CUBE}.activity_date = {dates}.calendar_date"
         relationship: many_to_one
+      - name: activity_weather
+        sql: "{CUBE}.activity_id = {activity_weather}.activity_id"
+        relationship: one_to_one
 
     dimensions:
       - name: activity_id

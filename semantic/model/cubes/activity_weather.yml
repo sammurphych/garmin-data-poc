@@ -1,0 +1,62 @@
+cubes:
+  - name: activity_weather
+    sql_table: marts.fct_activity_weather
+    description: >
+      Weather during each activity with a start location (Open-Meteo, for the area around the start point):
+      the hour it started in, plus averages over the hours it ran through.
+
+    dimensions:
+      - name: weather_activity_id
+        sql: activity_id
+        type: number
+        primary_key: true
+      - name: start_temperature_c
+        sql: start_temperature_c
+        type: number
+        description: Air temperature in the hour the activity started (°C)
+      - name: start_feels_like_c
+        sql: start_feels_like_c
+        type: number
+        description: Feels-like temperature at the start, with wind and humidity (°C)
+      - name: start_conditions
+        sql: start_conditions
+        type: string
+        description: "One of: Clear, Partly cloudy, Overcast, Fog, Drizzle, Rain, Snow, Thunderstorm"
+      - name: precipitation_mm
+        sql: precipitation_mm
+        type: number
+        description: Rain or snow during the activity (mm)
+      - name: humidity_pct
+        sql: avg_humidity_pct
+        type: number
+      - name: dew_point_c
+        sql: avg_dew_point_c
+        type: number
+        description: Average dew point during the activity (°C); above ~18 °C feels muggy and slows runs
+      - name: wind_speed_kmh
+        sql: avg_wind_speed_kmh
+        type: number
+
+    measures:
+      - name: avg_temperature_c
+        sql: avg_temperature_c
+        type: avg
+        description: Average air temperature during the activities (°C)
+      - name: avg_feels_like_c
+        sql: start_feels_like_c
+        type: avg
+      - name: avg_humidity_pct
+        sql: avg_humidity_pct
+        type: avg
+      - name: avg_dew_point_c
+        sql: avg_dew_point_c
+        type: avg
+      - name: total_precipitation_mm
+        sql: precipitation_mm
+        type: sum
+      - name: avg_wind_speed_kmh
+        sql: avg_wind_speed_kmh
+        type: avg
+      - name: max_wind_gust_kmh
+        sql: max_wind_gust_kmh
+        type: max

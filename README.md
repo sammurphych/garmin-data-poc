@@ -5,7 +5,7 @@ A trial of **dlt → MotherDuck (DuckDB) → SQLMesh → Cube Core → Evidence 
 ```
 Prefect Cloud  (cron 06:00 UTC, Prefect Managed work pool, code cloned from git)
   └─ garmin-daily flow
-       1. extract_load  dlt: Garmin Personal API → MotherDuck  health.raw_garmin.*
+       1. extract_load  dlt: Garmin Personal API, Withings, Open-Meteo weather → MotherDuck  health.raw_*
        2. transform     SQLMesh run: staging.* views → marts.* tables (+ audits)
        3. refresh_bi    POST Netlify build hook → Evidence site rebuilds (Mon + Thu only, to save Netlify credits)
 Render (free web services)
@@ -17,7 +17,7 @@ Local
 
 | Path | What it does |
 |---|---|
-| `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities` with `split_summaries`, `activity_samples`, `sleep`, `hrv`, `vo2max`) and Withings (`measures`: weight and body composition) |
+| `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities` with `split_summaries`, `activity_samples`, `sleep`, `hrv`, `vo2max`) Withings (`measures`: weight and body composition) and Open-Meteo (`hourly` weather for the area each activity starts in) |
 | `transform/` | SQLMesh project (`config.py` picks the gateway: `local` or `motherduck`) |
 | `flows/garmin_daily.py` | Prefect flow; `prefect.yaml` is the deployment and schedule |
 | `semantic/` | Cube Core models and views (`health`, `training`, `body`), Render Dockerfile, MCP server, local-model chat |
@@ -139,6 +139,15 @@ for i in $(seq 1 18); do WAREHOUSE=motherduck uv run python -m ingest.pipeline g
 cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WAREHOUSE=motherduck uv run sqlmesh plan
 ```
 Render redeploys Cube from the push. The Personal API has no splits, laps, heart-rate zones or weather endpoints, so splits and best efforts are calculated from the recordings; for 2025 onwards they match Garmin's own `fastest_split_*` figures to 0.1 s.
+
+**13. Weather.** `ingest/weather_source.py` loads hourly weather from [Open-Meteo](https://open-meteo.com)'s historical API (free for non-commercial use, no key) for the area each activity started in. Open-Meteo only receives the start point rounded to 0.1° (about 11 km), never the route. `marts.fct_activity_weather` has the temperature, feels-like, conditions, humidity, dew point, rain and wind for each activity, and Cube adds them to the `training` view. Treadmill and gym sessions have no start point, so no weather. The full history is about 500 calls, well within Open-Meteo's 10,000 a day:
+```bash
+WAREHOUSE=motherduck uv run python -m ingest.pipeline weather
+cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WAREHOUSE=motherduck uv run sqlmesh plan
+```
+After that the daily Prefect run fetches weather for new activities, and fetches the last week again because Open-Meteo revises recent days.
+
+**SQL linting.** SQLMesh's linter runs on every `sqlmesh plan`, and on its own with `cd transform && uv run sqlmesh lint`. Ambiguous or unknown columns, `SELECT *`, unregistered raw tables and unnamed columns stop the plan; a model without audits is a warning. The rules are in `transform/config.py`. SQLFluff isn't used because it can't parse SQLMesh's `MODEL (...)` header or macros, and `sqlmesh format` isn't used because it rewrites comments.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).

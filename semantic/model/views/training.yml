@@ -1,6 +1,8 @@
 views:
   - name: training
-    description: Workouts and training volume. Use activity_date for time series.
+    description: >
+      Workouts and training volume, with the weather during each one. Use activity_date for time series.
+      Activities without a start location (treadmill, gym) have no weather.
     cubes:
       - join_path: activities
         includes: "*"
@@ -9,3 +11,7 @@ views:
         includes:
           - day_name
           - is_weekend
+      - join_path: activities.activity_weather
+        includes: "*"
+        excludes:
+          - weather_activity_id

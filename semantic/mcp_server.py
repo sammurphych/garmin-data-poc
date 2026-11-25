@@ -32,7 +32,8 @@ INSTRUCTIONS = (
     "repeat (e.g. two \"Austin Running\" on one day), so grouping by name or date alone "
     "merges them into one row. "
     "Per-kilometre splits, best efforts inside runs (e.g. fastest 5 km ever, including within longer runs) and "
-    "workout segments (warm-up, main set, cool-down) are in the splits, efforts and segments views."
+    "workout segments (warm-up, main set, cool-down) are in the splits, efforts and segments views. "
+    "The weather during each outdoor activity (temperature, conditions, humidity, dew point, rain, wind) is in training."
 )
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 

@@ -1,4 +1,4 @@
-"""Daily health pipeline: dlt loads (Garmin, Withings) -> SQLMesh run -> Evidence (Netlify) rebuild.
+"""Daily health pipeline: dlt loads (Garmin, Withings, weather) -> SQLMesh run -> Evidence (Netlify) rebuild.
 
 Local:  uv run python flows/garmin_daily.py        (reads .env)
 Cloud:  deployed via prefect.yaml to a Prefect Managed work pool, secrets from Secret blocks.
@@ -67,6 +67,15 @@ def extract_withings() -> str:
     return str(info)
 
 
+@task(retries=1, retry_delay_seconds=300)
+def extract_weather() -> str:
+    from ingest.pipeline import run_weather
+
+    info = run_weather()
+    get_run_logger().info(str(info))
+    return str(info)
+
+
 @task
 def transform() -> None:
     from sqlmesh import Context
@@ -93,9 +102,10 @@ def garmin_daily(rebuild_dashboards: bool | None = None) -> None:
     """rebuild_dashboards: True or False forces the Netlify rebuild on or off; None follows the weekly schedule."""
     load_secrets()
     extract_garmin()
-    # A Withings failure (e.g. an expired login) shouldn't stop Garmin data reaching the
+    # A Withings or weather failure (e.g. an expired login) shouldn't stop Garmin data reaching the
     # dashboards, but the run still ends Failed so it gets noticed.
     withings = extract_withings(return_state=True)
+    weather = extract_weather(return_state=True)
     transform()
     if rebuild_dashboards is None:
         rebuild_dashboards = datetime.now(timezone.utc).weekday() in DASHBOARD_REBUILD_WEEKDAYS
@@ -103,8 +113,9 @@ def garmin_daily(rebuild_dashboards: bool | None = None) -> None:
         refresh_bi()
     else:
         get_run_logger().info("Not a dashboard rebuild day; skipping the Netlify build")
-    if withings.is_failed():
-        raise RuntimeError("Withings load failed; Garmin, SQLMesh and dashboards still updated")
+    failed = [name for name, state in (("Withings", withings), ("Weather", weather)) if state.is_failed()]
+    if failed:
+        raise RuntimeError(f"{' and '.join(failed)} load failed; Garmin, SQLMesh and dashboards still updated")
 
 
 if __name__ == "__main__":

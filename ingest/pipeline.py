@@ -3,7 +3,7 @@
     uv run python -m ingest.pipeline                # every configured source, WAREHOUSE from .env
     uv run python -m ingest.pipeline withings       # one source
 
-Each source is its own dlt pipeline and raw schema (raw_garmin, raw_withings),
+Each source is its own dlt pipeline and raw schema (raw_garmin, raw_withings, raw_weather),
 named per warehouse so each warehouse tracks its own load progress and a fresh
 warehouse backfills in full.
 """
@@ -60,7 +60,29 @@ def run_withings():
     return _run("withings", withings_source())
 
 
-SOURCES = {"garmin": run_garmin, "withings": run_withings}
+def _warehouse():
+    import duckdb
+
+    if os.getenv("WAREHOUSE", "local") == "motherduck":
+        db = os.getenv("MOTHERDUCK_DATABASE", "health")
+        return duckdb.connect(f"md:{db}", config={"motherduck_token": os.environ["MOTHERDUCK_TOKEN"]})
+    return duckdb.connect(str(REPO_ROOT / "health.duckdb"), read_only=True)
+
+
+def run_weather():
+    """Weather for the activities already loaded, so it runs after Garmin."""
+    from ingest.weather_source import weather_source
+
+    with _warehouse() as con:
+        starts = con.execute("""
+            SELECT activity_id, start_latitude, start_longitude, CAST(CAST(start_time_gmt AS TIMESTAMP) AS DATE)
+            FROM raw_garmin.activities
+            WHERE start_latitude IS NOT NULL AND start_longitude IS NOT NULL
+        """).fetchall()
+    return _run("weather", weather_source(starts))
+
+
+SOURCES = {"garmin": run_garmin, "withings": run_withings, "weather": run_weather}
 
 
 if __name__ == "__main__":
