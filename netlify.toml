@@ -1,10 +1,13 @@
 # Netlify builds the Evidence site itself (no GitHub Actions).
 # Set env var EVIDENCE_SOURCE__motherduck__token in Netlify (the dashboards token, MOTHERDUCK_READ_TOKEN in .env).
-# Prefect's last task POSTs to this site's build hook after each daily load.
+# Prefect's last task POSTs to this site's build hook on Mondays and Thursdays (see flows/garmin_daily.py).
 [build]
   base    = "dashboards"
   command = "npm run sources && npm run build"
   publish = "build"
+  # Skip push builds when nothing under dashboards/ or this file changed: each deploy costs Netlify credits.
+  # The command runs in the base directory, so "." is dashboards/. Exit 0 = skip, 1 = build.
+  ignore  = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../netlify.toml"
 
 [build.environment]
   NODE_VERSION = "22"

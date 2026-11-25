@@ -7,7 +7,7 @@ Prefect Cloud  (cron 06:00 UTC, Prefect Managed work pool, code cloned from git)
   └─ garmin-daily flow
        1. extract_load  dlt: Garmin Personal API → MotherDuck  health.raw_garmin.*
        2. transform     SQLMesh run: staging.* views → marts.* tables (+ audits)
-       3. refresh_bi    POST Netlify build hook → Evidence site rebuilds from MotherDuck
+       3. refresh_bi    POST Netlify build hook → Evidence site rebuilds (Mon + Thu only, to save Netlify credits)
 Render (free web services)
   ├─ health-cube: Cube Core over health.marts → REST API (Docker image from semantic/Dockerfile)
   └─ health-mcp:  MCP server over HTTPS, OAuth sign-in → claude.ai custom connector

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -27,6 +28,10 @@ SECRETS = {
     "withings-client-secret": "WITHINGS_CLIENT_SECRET",
     "sqlmesh-state-db-url": "SQLMESH_STATE_DB_URL",
 }
+
+# Each Netlify production deploy costs credits, and a daily rebuild alone exceeds the free plan's monthly
+# allowance, so the dashboards rebuild on Mondays and Thursdays (UTC). Cube and the MCP stay current daily.
+DASHBOARD_REBUILD_WEEKDAYS = {0, 3}
 
 
 def load_secrets() -> None:
@@ -84,14 +89,20 @@ def refresh_bi() -> None:
 
 
 @flow(name="garmin-daily", log_prints=True)
-def garmin_daily() -> None:
+def garmin_daily(rebuild_dashboards: bool | None = None) -> None:
+    """rebuild_dashboards: True or False forces the Netlify rebuild on or off; None follows the weekly schedule."""
     load_secrets()
     extract_garmin()
     # A Withings failure (e.g. an expired login) shouldn't stop Garmin data reaching the
     # dashboards, but the run still ends Failed so it gets noticed.
     withings = extract_withings(return_state=True)
     transform()
-    refresh_bi()
+    if rebuild_dashboards is None:
+        rebuild_dashboards = datetime.now(timezone.utc).weekday() in DASHBOARD_REBUILD_WEEKDAYS
+    if rebuild_dashboards:
+        refresh_bi()
+    else:
+        get_run_logger().info("Not a dashboard rebuild day; skipping the Netlify build")
     if withings.is_failed():
         raise RuntimeError("Withings load failed; Garmin, SQLMesh and dashboards still updated")
 
