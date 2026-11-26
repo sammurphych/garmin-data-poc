@@ -1,10 +1,15 @@
 """Withings OAuth2.
 
 Withings rotates the refresh token on every use (the old one stops working 8 hours
-later), so the current token has one home: the Prefect Secret block
-`withings-refresh-token`. Laptop runs and Prefect Cloud runs both read it from
-there and write the new token back, so they never drift apart. Local runs need
-`prefect cloud login`.
+later), so the current token has one home: the table `health_app.withings_token` in
+the project's Postgres (SQLMESH_STATE_DB_URL, the Neon database that also holds
+SQLMesh's state). The laptop, the Airflow server and Prefect all read it from there
+and write the new token back, so they never drift apart.
+
+A refresh also returns a 3-hour access token, which is kept next to it and reused
+until shortly before it expires, so polling every half hour logs in about 8 times a
+day rather than 48. The row is locked while a refresh is in flight, so two runs at
+once don't both spend the same refresh token.
 
 One-time authorisation (opens a browser, then stores the first refresh token):
 
@@ -22,6 +27,7 @@ import sys
 import threading
 import time
 import webbrowser
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -30,7 +36,6 @@ from dlt.sources.helpers import requests
 AUTHORIZE_URL = "https://account.withings.com/oauth2_user/authorize2"
 TOKEN_URL = "https://wbsapi.withings.net/v2/oauth2"
 SCOPE = "user.metrics"
-REFRESH_TOKEN_BLOCK = "withings-refresh-token"
 
 
 def _client() -> tuple[str, str]:
@@ -50,23 +55,56 @@ def _request_token(**params) -> dict:
     return payload["body"]
 
 
-def _load_refresh_token() -> str:
-    from prefect.blocks.system import Secret
+def _connect():
+    import psycopg2
 
-    return Secret.load(REFRESH_TOKEN_BLOCK).get()
+    return psycopg2.connect(os.environ["SQLMESH_STATE_DB_URL"])
+
+
+def _ensure_table(cur) -> None:
+    cur.execute("create schema if not exists health_app")
+    cur.execute("""
+        create table if not exists health_app.withings_token (
+            id int primary key default 1 check (id = 1),
+            refresh_token text not null,
+            access_token text,
+            access_expires_at timestamptz,
+            updated_at timestamptz not null default now()
+        )""")
 
 
 def _save_refresh_token(token: str) -> None:
-    from prefect.blocks.system import Secret
-
-    Secret(value=token).save(REFRESH_TOKEN_BLOCK, overwrite=True)
+    """Store a refresh token that came from outside get_access_token(), e.g. a new authorisation."""
+    with closing(_connect()) as conn, conn, conn.cursor() as cur:
+        _ensure_table(cur)
+        cur.execute("""
+            insert into health_app.withings_token (id, refresh_token) values (1, %s)
+            on conflict (id) do update
+               set refresh_token = excluded.refresh_token, access_token = null, access_expires_at = null,
+                   updated_at = now()""", (token,))
 
 
 def get_access_token() -> str:
-    """Swap the stored refresh token for a 3-hour access token and store the rotated refresh token."""
-    body = _request_token(grant_type="refresh_token", refresh_token=_load_refresh_token())
-    _save_refresh_token(body["refresh_token"])
-    return body["access_token"]
+    """A valid access token: the stored one if it has a while left, otherwise a fresh one from the stored
+    refresh token, whose rotated replacement is stored in the same transaction."""
+    with closing(_connect()) as conn, conn, conn.cursor() as cur:
+        _ensure_table(cur)
+        cur.execute("""
+            select refresh_token, access_token, access_expires_at > now() + interval '15 minutes'
+              from health_app.withings_token where id = 1 for update""")
+        row = cur.fetchone()
+        if row is None:
+            raise RuntimeError("No Withings token stored yet. Run: uv run python -m ingest.withings_auth")
+        refresh_token, access_token, still_valid = row
+        if access_token and still_valid:
+            return access_token
+        body = _request_token(grant_type="refresh_token", refresh_token=refresh_token)
+        cur.execute("""
+            update health_app.withings_token
+               set refresh_token = %s, access_token = %s, access_expires_at = now() + %s * interval '1 second',
+                   updated_at = now()
+             where id = 1""", (body["refresh_token"], body["access_token"], int(body.get("expires_in", 10800))))
+        return body["access_token"]
 
 
 def _wait_for_code_on_localhost(redirect_uri: str, expected_state: str) -> str:
@@ -147,7 +185,7 @@ def authorise() -> None:
 
     body = _request_token(grant_type="authorization_code", code=code, redirect_uri=redirect_uri)
     _save_refresh_token(body["refresh_token"])
-    print(f"Done. Refresh token saved to the Prefect Secret block '{REFRESH_TOKEN_BLOCK}'.")
+    print("Done. Refresh token saved to health_app.withings_token.")
 
 
 if __name__ == "__main__":

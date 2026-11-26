@@ -32,7 +32,7 @@ Local
 | Netlify build hook URL | Prefect Secret `evidence-build-hook` | refresh_bi |
 | SQLMesh state database URL (Postgres, e.g. Neon) | Prefect Secret `sqlmesh-state-db-url` | SQLMesh |
 | Withings client id / secret | Prefect Secrets `withings-client-id`, `withings-client-secret` | dlt |
-| Withings refresh token (rotates every run) | Prefect Secret `withings-refresh-token`, local runs too | dlt |
+| Withings refresh token (rotates on each login) | table `health_app.withings_token` in the SQLMesh state database, for every run | dlt |
 | GitHub fine-grained token (only if the repo is private) | Prefect Secret `github-token` | git clone in `prefect.yaml` |
 | MotherDuck dashboards token (read-only on Business plan, a separate regular token on free) | Netlify env `EVIDENCE_SOURCE__motherduck__token` | Evidence build |
 | Everything above, for dev | `.env` (gitignored, copy from `.env.example`) | local runs, Cube, MCP |
@@ -173,11 +173,26 @@ The loads hand over to `transform` through Airflow Assets: a load task with `out
 
 Garmin's Personal API can't notify us of new activities, so `garmin_poll` stays a poll. Withings can call a webhook, but it needs a public URL, so that waits until Airflow runs on a server.
 
-The DAGs start paused. Pause the Prefect deployment before switching them on, or both rebuild the dashboards on Mondays and Thursdays. Withings keeps a rotated refresh token working for 8 hours, so a Prefect and an Airflow load at the same moment doesn't break the login. The setup script swaps two pins in Airflow's constraints file (cryptography and libcst) for versions with Intel-Mac wheels.
+The DAGs start paused. Pause the Prefect deployment before switching them on, or both rebuild the dashboards on Mondays and Thursdays. With `catchup=False` Airflow still runs the latest missed slot as soon as a DAG is switched on or the laptop wakes, so `rebuild_dashboards` skips a build that starts more than 2 hours late. Every run, wherever it runs, reads and writes the Withings token in `health_app.withings_token` with the row locked, and reuses the 3-hour access token until it nearly expires. The setup script swaps two pins in Airflow's constraints file (cryptography and libcst) for versions with Intel-Mac wheels.
+
+**Airflow on a server (Oracle Cloud Always Free).** `airflow/server/` runs the same DAGs with Docker Compose: Postgres for Airflow's database, the scheduler with the LocalExecutor, the DAG processor, the triggerer and the API server. The tasks' `uv run` builds the pipeline's venv in `airflow/server/state/` (gitignored) on first start. The UI listens only on the server's `127.0.0.1:8080`, so no port but SSH is open; reach it through a tunnel and log in as `admin` with the password in `airflow/server/state/passwords.json`.
+```bash
+# on the server (Ubuntu, ARM), once
+git clone https://github.com/sammurphych/garmin-data-poc.git
+# on the laptop
+scp .env ubuntu@<server>:garmin-data-poc/
+# on the server: installs Docker, generates Airflow's secrets in airflow/server/.env, starts everything
+garmin-data-poc/airflow/server/install.sh
+# on the laptop, to use the UI at http://localhost:8080
+ssh -N -L 8080:localhost:8080 ubuntu@<server>
+# deploy a change: on the server
+cd garmin-data-poc && git pull && airflow/server/install.sh
+```
+Run Airflow in one place at a time: pause the laptop's DAGs (or stop `standalone`) before switching the server's on.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).
 - Every run re-pulls the last 3 days, because Garmin revises recent days. The merge on natural keys keeps rows unique, and SQLMesh `lookback 3` reprocesses the same days.
 - SQLMesh state for the motherduck gateway is in Postgres when `SQLMESH_STATE_DB_URL` is set, and in MotherDuck otherwise.
-- Withings rotates its refresh token on every use, so the token lives only in the Prefect Secret `withings-refresh-token`. Laptop and cloud runs both read and update it there. Withings asks for at most one poll per user every 10 minutes.
+- Withings rotates its refresh token on every use, so the token lives in one place, `health_app.withings_token` in the SQLMesh state database (Neon), which every run reads and updates. The Prefect Secret `withings-refresh-token` is no longer used. Withings asks for at most one poll per user every 10 minutes.
 - Cube runs on Render's free tier and sleeps after ~15 minutes idle. Its API needs a JWT signed with `CUBEJS_API_SECRET`, which the MCP server creates per request.

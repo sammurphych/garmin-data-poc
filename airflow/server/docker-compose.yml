@@ -1,0 +1,98 @@
+# Airflow on one server: Postgres, the scheduler (which runs tasks itself with the LocalExecutor), the DAG
+# processor, the triggerer and the API server with the UI. Started by install.sh, which writes .env here.
+#
+# The UI is only on the server's own 127.0.0.1:8080, so nothing is open to the internet; reach it through
+# an SSH tunnel:  ssh -L 8080:localhost:8080 ubuntu@<server>
+
+x-airflow: &airflow
+  build: .
+  image: health-airflow:3.3.2
+  restart: unless-stopped
+  # The repo's owner (install.sh sets AIRFLOW_UID), so tasks can write the dlt and SQLMesh files in it.
+  user: "${AIRFLOW_UID}:0"
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${POSTGRES_PASSWORD}@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${JWT_SECRET}
+    AIRFLOW__API__SECRET_KEY: ${API_SECRET_KEY}
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://api-server:8080/execution/
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/health/airflow/dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
+    # One login, with its password in state/passwords.json. The SSH tunnel is the real lock on the door.
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/state/passwords.json
+    # The pipeline's venv, uv's cache and dlt's local state live in state/, outside the repo checkout.
+    UV_PROJECT_ENVIRONMENT: /opt/state/venv
+    UV_CACHE_DIR: /opt/state/uv-cache
+    DLT_PIPELINES_DIR: /opt/state/dlt
+  volumes:
+    - ../..:/opt/health        # the repo, with its .env holding the pipeline's secrets
+    - ./state:/opt/state
+    - ./state/logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+
+  # Runs once on each `up`: migrates the database, creates the pools and builds the pipeline's venv.
+  init:
+    <<: *airflow
+    restart: "no"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow pools set garmin_api 1 "One Garmin load or check at a time"
+        airflow pools set withings_api 1 "One Withings login at a time: it rotates the refresh token"
+        cd /opt/health && uv sync --frozen
+
+  scheduler:
+    <<: *airflow
+    command: scheduler
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  dag-processor:
+    <<: *airflow
+    command: dag-processor
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  triggerer:
+    <<: *airflow
+    command: triggerer
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  api-server:
+    <<: *airflow
+    command: api-server
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres:

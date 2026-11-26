@@ -88,12 +88,22 @@ def rebuild_dashboards():
     """Rebuilds the Evidence site on Netlify on Mondays and Thursdays. Each deploy costs Netlify credits,
     so it's on a fixed schedule rather than after every transform. Trigger it by hand for an extra build."""
 
+    @task.short_circuit
+    def on_schedule(dag_run=None) -> bool:
+        """With catchup=False Airflow still runs the latest missed slot straight away, e.g. on switching the
+        DAG on or after the laptop wakes. Skip the build then: the next slot rebuilds anyway."""
+        if dag_run.run_type != "scheduled":
+            return True
+        late = pendulum.now("UTC") - dag_run.run_after
+        print(f"{late} after the scheduled time")
+        return late < pendulum.duration(hours=2)
+
     @task.bash(cwd=str(REPO_ROOT), retry_delay=pendulum.duration(minutes=1))
     def refresh_bi() -> str:
         # The build hook URL is in .env; -f makes curl fail on an HTTP error.
         return 'set -a && . ./.env && set +a && curl -fsS -X POST "$EVIDENCE_BUILD_HOOK"'
 
-    refresh_bi()
+    on_schedule() >> refresh_bi()
 
 
 garmin_poll()

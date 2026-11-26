@@ -14,3 +14,4 @@ logs/
 sqlmesh_state.json
 airflow/home/
 airflow/.constraints.txt
+airflow/server/state/
