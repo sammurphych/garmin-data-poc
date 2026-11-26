@@ -155,6 +155,14 @@ After that the daily Prefect run fetches weather for new activities, and fetches
 
 Both run before a commit that changes the models, from `.githooks/pre-commit` (SQLFluff on the staged models only). Turn the hook on once per clone with `git config core.hooksPath .githooks`; skip it for one commit with `git commit --no-verify`.
 
+**Airflow (local, alongside Prefect).** `airflow/dags/health_daily.py` is the same pipeline as an Airflow 3 DAG, for trying Airflow; Prefect still runs the daily job. Airflow lives in its own venv (`airflow/.venv`) because it pins hundreds of packages, and its tasks run the pipeline in the project's venv with `uv run`. Its config, SQLite database and logs are in `airflow/home/` (gitignored).
+```bash
+airflow/setup.sh                       # once: installs Airflow 3.3.2 into airflow/.venv
+airflow/run.sh dags test health_daily -c '{"rebuild_dashboards": false}'   # one full run in the terminal
+airflow/run.sh standalone              # scheduler and UI on http://localhost:8080 (no login locally)
+```
+The DAG starts paused. Switched on, it runs at 07:00 UTC, an hour after Prefect, so the two never use the Withings token at the same time. Leave `rebuild_dashboards` false on manual runs while Prefect also rebuilds the site, or Netlify builds twice. The setup script swaps two pins in Airflow's constraints file (cryptography and libcst) for versions with Intel-Mac wheels.
+
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).
 - Every run re-pulls the last 3 days, because Garmin revises recent days. The merge on natural keys keeps rows unique, and SQLMesh `lookback 3` reprocesses the same days.

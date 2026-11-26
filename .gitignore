@@ -12,3 +12,5 @@ dashboards/build/
 dashboards/.svelte-kit/
 logs/
 sqlmesh_state.json
+airflow/home/
+airflow/.constraints.txt
