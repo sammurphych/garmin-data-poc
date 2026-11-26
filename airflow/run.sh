@@ -15,4 +15,6 @@ export AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS=True
 # Objective-C initialisation without these.
 export no_proxy='*'
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-exec "$DIR/.venv/bin/airflow" "$@"
+# `standalone` starts the scheduler, API server and the rest by calling `airflow` from the PATH.
+export PATH="$DIR/.venv/bin:$PATH"
+exec airflow "$@"
