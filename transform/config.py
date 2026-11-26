@@ -52,7 +52,12 @@ if os.getenv("MOTHERDUCK_TOKEN"):
 config = Config(
     gateways=gateways,
     default_gateway=os.getenv("WAREHOUSE", "local"),
-    model_defaults=ModelDefaultsConfig(dialect="duckdb", start=os.getenv("GARMIN_START_DATE", "2009-12-01")),
+    # allow_partials lets `sqlmesh run --ignore-cron` process today so far, so an activity or weigh-in shows up
+    # in the marts within the hour rather than after midnight; each such run redoes today. A plain `sqlmesh run`
+    # still only processes finished days.
+    model_defaults=ModelDefaultsConfig(
+        dialect="duckdb", start=os.getenv("GARMIN_START_DATE", "2009-12-01"), allow_partials=True,
+    ),
     # Runs on every `sqlmesh plan` (errors stop it) and on its own with `sqlmesh lint`.
     # Unit tests aren't required: the audits on each model check the data instead.
     linter=LinterConfig(

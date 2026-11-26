@@ -155,13 +155,25 @@ After that the daily Prefect run fetches weather for new activities, and fetches
 
 Both run before a commit that changes the models, from `.githooks/pre-commit` (SQLFluff on the staged models only). Turn the hook on once per clone with `git config core.hooksPath .githooks`; skip it for one commit with `git commit --no-verify`.
 
-**Airflow (local, alongside Prefect).** `airflow/dags/health_daily.py` is the same pipeline as an Airflow 3 DAG, for trying Airflow; Prefect still runs the daily job. Airflow lives in its own venv (`airflow/.venv`) because it pins hundreds of packages, and its tasks run the pipeline in the project's venv with `uv run`. Its config, SQLite database and logs are in `airflow/home/` (gitignored).
+**Airflow (local, alongside Prefect).** `airflow/dags/` has the same pipeline as Airflow 3 DAGs that run when new data arrives instead of once a day; Prefect still runs the daily job. Airflow lives in its own venv (`airflow/.venv`) because it pins hundreds of packages, and its tasks run the pipeline in the project's venv with `uv run`. Its config, SQLite database and logs are in `airflow/home/` (gitignored).
 ```bash
-airflow/setup.sh                       # once: installs Airflow 3.3.2 into airflow/.venv
-airflow/run.sh dags test health_daily -c '{"rebuild_dashboards": false}'   # one full run in the terminal
+airflow/setup.sh                       # once: installs Airflow 3.3.2, creates its database and pools
 airflow/run.sh standalone              # scheduler and UI on http://localhost:8080 (no login locally)
+airflow/run.sh dags test garmin_poll   # one run of one DAG in the terminal
 ```
-The DAG starts paused. Switched on, it runs at 07:00 UTC, an hour after Prefect, so the two never use the Withings token at the same time. Leave `rebuild_dashboards` false on manual runs while Prefect also rebuilds the site, or Netlify builds twice. The setup script swaps two pins in Airflow's constraints file (cryptography and libcst) for versions with Intel-Mac wheels.
+| DAG | Runs | Does |
+|---|---|---|
+| `garmin_poll` | every 30 min | asks Garmin for the last 3 days' activities (`ingest/changes.py`); only if one is new, loads Garmin then weather |
+| `garmin_daily` | 07:00 UTC | loads Garmin then weather whatever happened, for sleep, HRV, steps and Garmin's corrections |
+| `withings_poll` | every 30 min | asks Withings for weigh-ins changed since the last load; only if there are any, loads Withings |
+| `transform` | when `raw_weather` or `raw_withings` updates | `sqlmesh run prod --ignore-cron` |
+| `rebuild_dashboards` | Mon + Thu 08:00 UTC | Netlify build hook |
+
+The loads hand over to `transform` through Airflow Assets: a load task with `outlets=[asset]` records an event when it succeeds, and `transform` is scheduled on those assets. The checks are single API calls that don't touch MotherDuck, so polling costs no warehouse compute. The models have `allow_partials`, so `--ignore-cron` processes today so far and new data reaches the marts within the hour, not after midnight; a plain `sqlmesh run` (Prefect) still only processes finished days. One-slot pools (`garmin_api`, `withings_api`) stop two DAGs loading the same source at once. The Airflow Variable `garmin_seen_activity_ids` holds the activity ids already loaded.
+
+Garmin's Personal API can't notify us of new activities, so `garmin_poll` stays a poll. Withings can call a webhook, but it needs a public URL, so that waits until Airflow runs on a server.
+
+The DAGs start paused. Pause the Prefect deployment before switching them on, or both rebuild the dashboards on Mondays and Thursdays. Withings keeps a rotated refresh token working for 8 hours, so a Prefect and an Airflow load at the same moment doesn't break the login. The setup script swaps two pins in Airflow's constraints file (cryptography and libcst) for versions with Intel-Mac wheels.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).

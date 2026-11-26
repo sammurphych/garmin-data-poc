@@ -13,3 +13,9 @@ curl -fsSL "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFL
   | sed -e 's/^cryptography==.*/cryptography==48.0.1/' -e 's/^libcst==.*/libcst==1.8.6/' > .constraints.txt
 uv venv --clear --python "$PYTHON_VERSION" .venv
 uv pip install --python .venv "apache-airflow==${AIRFLOW_VERSION}" --constraint .constraints.txt
+
+# Airflow's metadata database (SQLite in airflow/home locally), and the one-slot pools that stop two DAGs
+# loading the same source at once (see dags/health_common.py).
+./run.sh db migrate
+./run.sh pools set garmin_api 1 "One Garmin load or check at a time"
+./run.sh pools set withings_api 1 "One Withings login at a time: it rotates the refresh token"
