@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from typing import Iterator
 
 import dlt
+from dlt.common import logger
 from dlt.sources.helpers import requests
 
 from ingest.garmin_auth import BASE_URL, get_access_token
@@ -32,6 +33,11 @@ DETAIL_MAX_SAMPLES = 100_000  # above any real activity (a 5 h run at 1 Hz is 18
 # Left out of the recordings: exact location shows where you live and run, and nothing downstream needs it.
 GPS_METRICS = {"directLatitude", "directLongitude"}
 REQUEST_PAUSE_S = 0.5  # rate limits aren't published, so be polite
+# A recording that still fails after the request retries (Garmin sometimes answers 504) is skipped and fetched
+# again on the next runs, up to this many runs. More failures than MAX_SKIPPED_PER_RUN in one run means Garmin
+# itself is down, so the run fails instead.
+SAMPLE_ATTEMPTS = 5
+MAX_SKIPPED_PER_RUN = 5
 
 
 class GarminClient:
@@ -45,6 +51,12 @@ class GarminClient:
             return None
         resp.raise_for_status()
         return resp.json()
+
+
+def _is_temporary(e: requests.RequestException) -> bool:
+    """A server error or timeout, as opposed to a bad request or an expired login."""
+    status = e.response.status_code if e.response is not None else None
+    return status is None or status >= 500
 
 
 def _chunks(start: date, end: date, max_days: int) -> Iterator[tuple[date, date]]:
@@ -126,24 +138,59 @@ def garmin_source(
     # heart rate, speed, grade-adjusted speed, elevation, cadence, power, running dynamics. Column names follow
     # Garmin's metric keys (directHeartRate -> direct_heart_rate), and older watches record fewer of them.
     # An activity's rows are replaced as a whole when it is fetched again (lookback days).
+    def recording(activity_id: int) -> list[dict]:
+        body = client.get(f"/activity-service/activity/{activity_id}/details",
+                          {"maxChartSize": DETAIL_MAX_SAMPLES, "maxPolylineSize": 0})
+        samples = (body or {}).get("activityDetailMetrics") or []
+        if not samples:
+            return []  # manual entries and some indoor activities have no recording
+        keys = {d["metricsIndex"]: d["key"] for d in body["metricDescriptors"]}
+        return [
+            {"activity_id": activity_id, "sample_index": i,
+             **{keys[j]: v for j, v in enumerate(s["metrics"]) if keys.get(j) not in GPS_METRICS}}
+            for i, s in enumerate(samples)
+        ]
+
     @dlt.resource(name="activity_samples", merge_key="activity_id",
                   write_disposition={"disposition": "merge", "strategy": "delete-insert"},
                   columns={"activity_id": {"data_type": "bigint"}, "sample_index": {"data_type": "bigint"}})
     def activity_samples():
+        state = dlt.current.resource_state()
+        failed = state.setdefault("failed_attempts", {})  # activity id (str) -> runs it has failed in
+        skipped_this_run = 0
+
+        def fetch(activity_id: int) -> list[dict]:
+            nonlocal skipped_this_run
+            try:
+                rows = recording(activity_id)
+            except requests.RequestException as e:
+                if not _is_temporary(e):
+                    raise
+                skipped_this_run += 1
+                if skipped_this_run > MAX_SKIPPED_PER_RUN:
+                    raise
+                attempts = failed.get(str(activity_id), 0) + 1
+                if attempts >= SAMPLE_ATTEMPTS:
+                    failed.pop(str(activity_id), None)
+                    logger.warning(f"Giving up on the recording of activity {activity_id} after {attempts} runs: {e}")
+                else:
+                    failed[str(activity_id)] = attempts
+                    logger.warning(f"Skipping the recording of activity {activity_id} until the next run: {e}")
+                return []
+            failed.pop(str(activity_id), None)
+            return rows
+
+        retried = [int(i) for i in failed]  # skipped on earlier runs
+        for activity_id in retried:
+            if rows := fetch(activity_id):
+                yield rows
         begin, end = _window(start_date, lookback_days, max_days=SAMPLES_DAYS_PER_RUN)
         for page in activity_pages(begin, end):
             for a in page:
-                body = client.get(f"/activity-service/activity/{a['activityId']}/details",
-                                  {"maxChartSize": DETAIL_MAX_SAMPLES, "maxPolylineSize": 0})
-                samples = (body or {}).get("activityDetailMetrics") or []
-                if not samples:
-                    continue  # manual entries and some indoor activities have no recording
-                keys = {d["metricsIndex"]: d["key"] for d in body["metricDescriptors"]}
-                yield [
-                    {"activity_id": a["activityId"], "sample_index": i,
-                     **{keys[j]: v for j, v in enumerate(s["metrics"]) if keys.get(j) not in GPS_METRICS}}
-                    for i, s in enumerate(samples)
-                ]
+                if a["activityId"] in retried:
+                    continue  # fetched above; loading it twice would duplicate its rows
+                if rows := fetch(a["activityId"]):
+                    yield rows
         _mark_loaded(end)
 
     @dlt.resource(name="sleep", primary_key="calendarDate", write_disposition="merge")
