@@ -1,0 +1,19 @@
+#!/bin/sh
+# Lint the SQLMesh models before a commit that changes them. Turned on once per clone with:
+#   git config core.hooksPath .githooks
+# Skip it for one commit with `git commit --no-verify`.
+set -e
+
+models=$(git diff --cached --name-only --diff-filter=ACMR -- 'transform/models/*.sql')
+other=$(git diff --cached --name-only -- transform/config.py transform/linter transform/external_models.yaml .sqlfluff)
+[ -z "$models$other" ] && exit 0
+
+if [ -n "$models" ]; then
+  echo "SQLFluff on the staged models..."
+  # shellcheck disable=SC2086  # the paths have no spaces
+  uv run --quiet python transform/lint_sql.py $models || {
+    echo "Fix with: uv run python transform/lint_sql.py --fix <files>, then stage the changes."; exit 1; }
+fi
+
+echo "SQLMesh linter..."
+uv run --quiet sqlmesh -p transform lint
