@@ -58,4 +58,4 @@ where week_start >= current_date - interval 26 week
 <BarChart data={weekly} x=week_start y=moving_minutes series=activity_type title="Weekly moving minutes by activity type" />
 <BarChart data={weekly} x=week_start y=training_load series=activity_type title="Weekly training load" />
 
-[All activities →](/activities) · [Running →](/running) · [Weight →](/weight)
+[All activities →](/activities) · [Running →](/running) · [Weight →](/weight) · [Data quality →](/data-quality)

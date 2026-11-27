@@ -8,7 +8,9 @@ MODEL (
   grain (activity_id, effort),
   audits (
     unique_combination_of_columns(columns := (activity_id, effort)),
-    accepted_range(column := best_seconds, min_v := 1, max_v := 36000)
+    accepted_range(column := best_seconds, min_v := 1, max_v := 36000),
+    -- 2:11/km is the 1000 m world record; anything faster is a recording problem the filters missed.
+    accepted_range(column := pace_min_per_km, min_v := 2.18)
   )
 );
 
@@ -16,19 +18,20 @@ MODEL (
 -- 5 km and 10 km), from the per-second samples. For every sample, an ASOF join finds the first later
 -- sample at least that distance further on, and the time between them is scaled to the exact distance.
 --
--- Rides and drives recorded as runs are left out, or they'd hold every record:
--- - since 2018 the watch records cadence, and a real run's median while moving is 150+ steps a minute
--- - earlier watches recorded none, and the activities averaging faster than 3:50/km over 8 km or more
---   were bike commutes (checked with the owner)
-WITH recorded_runs AS (
+-- Left out, or they'd hold the records:
+-- - activities recorded as runs that were rides or walks (marts.fct_activity_quality.likely_type)
+-- - stretches with a GPS jump or a vehicle's speed in them (the watch reading over 8 m/s, as on a day out
+--   that included a train): a running count of those samples is the same at both ends of a clean stretch
+WITH runs AS (
   SELECT
-    activity_id,
-    activity_date,
-    distance_km,
-    duration_minutes
-  FROM staging.stg_activities
-  WHERE activity_type ILIKE '%running%'
-    AND activity_date BETWEEN @start_ds AND @end_ds
+    a.activity_id,
+    a.activity_date,
+    a.distance_km
+  FROM staging.stg_activities AS a
+  LEFT JOIN marts.fct_activity_quality AS q USING (activity_id)
+  WHERE a.activity_type ILIKE '%running%'
+    AND COALESCE(q.likely_type, 'run') = 'run'
+    AND a.activity_date BETWEEN @start_ds AND @end_ds
 ),
 
 samples AS (
@@ -36,32 +39,12 @@ samples AS (
     s.activity_id,
     s.timer_s,
     s.distance_m,
-    s.cadence_spm,
-    s.speed_mps
+    COUNT(*) FILTER (WHERE s.is_gps_jump OR s.speed_mps > 8) OVER (
+      PARTITION BY s.activity_id ORDER BY s.sample_index
+    ) AS jumps_so_far
   FROM staging.stg_activity_samples AS s
-  INNER JOIN recorded_runs USING (activity_id)
+  INNER JOIN runs USING (activity_id)
   WHERE s.distance_m IS NOT NULL AND s.timer_s IS NOT NULL
-),
-
-moving_cadence AS (
-  SELECT
-    activity_id,
-    MEDIAN(cadence_spm) FILTER (WHERE speed_mps > 1) AS median_cadence_spm
-  FROM samples
-  GROUP BY activity_id
-),
-
-runs AS (
-  SELECT
-    r.activity_id,
-    r.activity_date,
-    r.distance_km
-  FROM recorded_runs AS r
-  LEFT JOIN moving_cadence AS c USING (activity_id)
-  WHERE CASE
-      WHEN c.median_cadence_spm IS NOT NULL THEN c.median_cadence_spm >= 130
-      ELSE NOT (r.distance_km >= 8 AND r.duration_minutes / r.distance_km < 3.83)
-    END
 ),
 
 -- The alias names the VALUES columns (SQLFluff's AL05 would delete it), and the ASOF join's
@@ -81,6 +64,7 @@ starts AS (
     s.distance_m,
     t.effort,
     t.effort_m,
+    s.jumps_so_far,
     s.distance_m + t.effort_m AS end_m
   FROM samples AS s
   INNER JOIN runs AS r USING (activity_id)
@@ -93,7 +77,8 @@ efforts AS (
     st.effort,
     st.effort_m,
     st.timer_s                                                              AS start_timer_s,
-    (e.timer_s - st.timer_s) * st.effort_m / (e.distance_m - st.distance_m) AS seconds
+    (e.timer_s - st.timer_s) * st.effort_m / (e.distance_m - st.distance_m) AS seconds,
+    e.jumps_so_far - st.jumps_so_far                                        AS jumps
   FROM starts AS st
   ASOF JOIN samples AS e ON st.activity_id = e.activity_id AND e.distance_m >= st.end_m  -- noqa: ST09
 )
@@ -108,6 +93,5 @@ SELECT
   ARG_MIN(e.start_timer_s, e.seconds)                      AS starts_at_timer_s
 FROM efforts AS e
 INNER JOIN runs AS r USING (activity_id)
--- Faster than 6.5 m/s (2:34/km) is beyond world-record pace for these distances: a GPS jump, not a run.
-WHERE e.seconds > 0 AND e.effort_m / e.seconds <= 6.5
+WHERE e.seconds > 0 AND e.jumps = 0
 GROUP BY e.activity_id, e.effort

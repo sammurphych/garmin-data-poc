@@ -9,7 +9,10 @@ MODEL (
   audits (
     unique_values(columns := (calendar_date)),
     accepted_range(column := resting_hr, min_v := 25, max_v := 120),
-    accepted_range(column := sleep_score, min_v := 0, max_v := 100)
+    accepted_range(column := sleep_score, min_v := 0, max_v := 100),
+    -- Warnings, not failures: a resting heart rate this far from the usual (illness, a bad night, a
+    -- watch worn loose) is worth a look, but it's real data.
+    z_score_non_blocking(column := resting_hr, threshold := 4)
   )
 );
 

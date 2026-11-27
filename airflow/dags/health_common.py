@@ -44,27 +44,35 @@ SEEN_ACTIVITIES = "garmin_seen_activity_ids"
 
 
 
-def notify_failure(context) -> None:
-    """Sends a phone notification through ntfy.sh when a task has failed for good (after its retries).
-    NTFY_TOPIC is set on the server only; anyone who knows the topic can read it, so it's a long random
-    name kept out of the repo. Without it (the laptop) this does nothing."""
+def send_ntfy(title: str, message: str, *, priority: str = "default", tags: str = "", click: str = "") -> None:
+    """A phone notification through ntfy.sh. NTFY_TOPIC is set on the server only; anyone who knows the topic
+    can read it, so it's a long random name kept out of the repo. Without it (the laptop) this does nothing."""
     topic = os.getenv("NTFY_TOPIC")
     if not topic:
         return
-    ti = context["ti"]
-    run_id = context["run_id"]
-    error = str(context.get("exception") or "no error message")[:300]
-    request = urllib.request.Request(f"https://ntfy.sh/{topic}", data=error.encode(), headers={
-        "Title": f"{ti.dag_id}: {ti.task_id} failed",
-        "Tags": "warning",
-        "Priority": "high",
-        # Opens the task's log, through the SSH tunnel.
-        "Click": f"http://localhost:8080/dags/{ti.dag_id}/runs/{quote(run_id, safe='')}/tasks/{ti.task_id}",
-    })
+    headers = {"Title": title, "Priority": priority}
+    if tags:
+        headers["Tags"] = tags
+    if click:
+        headers["Click"] = click
     try:
-        urllib.request.urlopen(request, timeout=10)
-    except Exception as e:  # a failed alert mustn't hide the task's own error
-        print(f"Couldn't send the ntfy alert: {e}")
+        urllib.request.urlopen(
+            urllib.request.Request(f"https://ntfy.sh/{topic}", data=message.encode(), headers=headers), timeout=10,
+        )
+    except Exception as e:  # a failed notification mustn't hide what it was about
+        print(f"Couldn't send the ntfy notification: {e}")
+
+
+def notify_failure(context) -> None:
+    """Every task's on_failure_callback: runs once a task has failed for good (after its retries)."""
+    ti = context["ti"]
+    send_ntfy(
+        f"{ti.dag_id}: {ti.task_id} failed",
+        str(context.get("exception") or "no error message")[:300],
+        priority="high", tags="warning",
+        # Opens the task's log, through the SSH tunnel.
+        click=f"http://localhost:8080/dags/{ti.dag_id}/runs/{quote(context['run_id'], safe='')}/tasks/{ti.task_id}",
+    )
 
 
 DEFAULT_ARGS = {"retries": 1, "retry_delay": timedelta(minutes=5), "on_failure_callback": notify_failure}

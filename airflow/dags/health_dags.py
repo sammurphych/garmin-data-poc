@@ -9,15 +9,17 @@ from __future__ import annotations
 import json
 
 import pendulum
-from airflow.sdk import dag, task
+from airflow.sdk import Variable, dag, task
 
 from health_common import (
     DEFAULT_ARGS, RAW_WEATHER, RAW_WITHINGS, REPO_ROOT, UV, WITHINGS_POOL, garmin_then_weather,
-    list_recent_activities, pipeline, seen_activities,
+    list_recent_activities, pipeline, seen_activities, send_ntfy,
 )
 
 START = pendulum.datetime(2026, 11, 1, tz="UTC")
 POLL_EVERY = "*/30 * * * *"
+# The data_checks keys already notified, so each flag is sent once.
+ALERTED_FLAGS = "data_checks_alerted"
 
 
 @dag(schedule=POLL_EVERY, start_date=START, catchup=False, max_active_runs=1, default_args=DEFAULT_ARGS,
@@ -105,8 +107,38 @@ def rebuild_dashboards():
     on_schedule() >> refresh_bi()
 
 
+@dag(schedule="0 9 * * *", start_date=START, catchup=False, max_active_runs=1, default_args=DEFAULT_ARGS,
+     tags=["health"])
+def data_checks():
+    """Once a day, after the morning load: a phone notification for each newly flagged activity or weigh-in
+    (transform/data_checks.py says what's flagged), and one if Garmin data has stopped arriving. Flags are
+    suspect data, not failures, so they're normal-priority notifications and the run still succeeds."""
+
+    @task.bash(cwd=str(REPO_ROOT))
+    def check_marts() -> str:
+        return f"{UV} run python transform/data_checks.py"
+
+    @task
+    def notify(result_json: str) -> None:
+        result = json.loads(result_json)
+        behind = result["garmin_days_behind"]
+        if behind is not None and behind > 2:
+            send_ntfy("No new Garmin data", f"The latest day with Garmin data is {behind} days ago. Is the "
+                      "Personal API key still valid? Check the garmin_daily runs.", priority="high", tags="warning")
+        sent = set(json.loads(Variable.get(ALERTED_FLAGS, default="[]")))
+        new = [f for f in result["flagged"] if f["key"] not in sent]
+        for flag in new:
+            send_ntfy(flag["title"], flag["detail"], tags="mag")
+        print(f"Garmin {behind} days behind; {len(new)} new flags of {len(result['flagged'])}")
+        # Keep only the keys still in the 14-day window, so the Variable doesn't grow forever.
+        Variable.set(ALERTED_FLAGS, json.dumps(sorted({f["key"] for f in result["flagged"]})))
+
+    notify(check_marts())
+
+
 garmin_poll()
 garmin_daily()
 withings_poll()
 transform()
 rebuild_dashboards()
+data_checks()

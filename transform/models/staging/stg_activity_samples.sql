@@ -24,5 +24,16 @@ SELECT
   direct_vertical_oscillation  AS vertical_oscillation_cm,
   direct_respiration_rate      AS respiration_rate,
   direct_performance_condition AS performance_condition,
-  direct_available_stamina     AS available_stamina
+  direct_available_stamina     AS available_stamina,
+  -- A GPS jump: since the previous sample the distance moved faster than 8 m/s (2:05/km, about 800 m
+  -- world-record pace) AND at least 20 m further than the watch's own speed accounts for. A lost signal
+  -- snapping back does this; the metre or two of GPS wobble in every recording doesn't. Gaps shorter than a
+  -- second count as one second.
+  COALESCE(
+    sum_distance - LAG(sum_distance) OVER w > 8 * GREATEST(sum_duration - LAG(sum_duration) OVER w, 1)
+    AND sum_distance - LAG(sum_distance) OVER w
+    - COALESCE(direct_speed, 0) * GREATEST(sum_duration - LAG(sum_duration) OVER w, 1) > 20,
+    FALSE
+  )                            AS is_gps_jump
 FROM raw_garmin.activity_samples
+WINDOW w AS (PARTITION BY activity_id ORDER BY sample_index)

@@ -38,5 +38,16 @@ SELECT
   weigh_ins,
   AVG(weight_kg) OVER (
     ORDER BY calendar_date RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW
-  ) AS weight_kg_7d_avg
+  )                                                        AS weight_kg_7d_avg,
+  weight_kg - LAG(weight_kg) OVER (ORDER BY calendar_date) AS change_kg,
+  -- Body weight doesn't move 3 kg within a week, or within a day: more likely someone else on the scale,
+  -- or a weigh-in in clothes.
+  COALESCE(
+    (
+      ABS(weight_kg - LAG(weight_kg) OVER (ORDER BY calendar_date)) > 3
+      AND calendar_date - LAG(calendar_date) OVER (ORDER BY calendar_date) <= 7
+    )
+    OR weight_kg - weight_kg_min > 3,
+    FALSE
+  )                                                        AS is_suspect
 FROM daily

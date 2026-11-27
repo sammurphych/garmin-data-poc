@@ -2,7 +2,7 @@
 
 A side project to try some data tools on something I care about: my running. Garmin records every run, Withings every weigh-in, and I wanted personal bests, km splits, pace in the heat and long-term trends without paying for Strava Premium. So this pulls my own data out of Garmin and Withings, models it, and serves it as dashboards and as something I can ask Claude about, on free tiers only. It costs nothing to run.
 
-**Live dashboards: [dainty-toffee-9e280f.netlify.app](https://dainty-toffee-9e280f.netlify.app)** (Running, Activities and Weight pages).
+**Live dashboards: [dainty-toffee-9e280f.netlify.app](https://dainty-toffee-9e280f.netlify.app)** (Running, Activities, Weight and Data quality pages).
 
 ![Running page: personal bests and the fastest 5 km each year](docs/images/running-bests.png)
 
@@ -45,6 +45,7 @@ flowchart LR
 
 - **Runs, not cron.** Garmin can't notify anyone of a new activity, so Airflow asks every 30 minutes with one small API call that never touches the warehouse, and loads only when something is new. The loads hand over to the models through Airflow Assets, and SQLMesh's `allow_partials` processes today so far, so a run is in the dashboards' data within the hour. ([`airflow/dags/`](airflow/dags/), [`ingest/changes.py`](ingest/changes.py))
 - **A token that rotates on every login.** Withings issues a new refresh token each time one is used. It lives in one Postgres row, locked during a refresh so two runs can't spend the same token, and the 3-hour access token is reused, which cuts logins from 48 a day to about 8. ([`ingest/withings_auth.py`](ingest/withings_auth.py))
+- **Catching bad data.** SQLMesh audits stop a run on impossible values; flags in the models mark the plausible-but-suspect: an activity recorded as a run whose cadence says ride or walk, GPS jumps, a guest on the scale. A daily Airflow check sends each new flag to the phone, and best efforts skip the bad stretches. ([`fct_activity_quality`](transform/models/marts/fct_activity_quality.sql), [`data_checks.py`](transform/data_checks.py))
 - **Splits without a splits API.** The Personal API has no splits or laps, so km splits and best efforts (fastest 1 km, mile, 5 km to marathon *within* any run) are calculated from each run's per-second recording. Since 2025 they match Garmin's own figures to 0.1 s. ([`transform/models/marts/`](transform/models/marts/))
 - **Flaky upstream.** Garmin sometimes answers 504 for a recording. That activity is skipped, remembered in dlt's state and fetched again on the next runs, rather than failing the whole load. ([`ingest/garmin_source.py`](ingest/garmin_source.py))
 - **Staying free.** Netlify builds cost credits, so the dashboards rebuild on Mondays and Thursdays and skip a build that starts late. Airflow fits a 6 GB ARM VM with one web worker and swap. Its UI is reachable only through an SSH tunnel, so the only open port is SSH.
@@ -174,6 +175,15 @@ cd transform && WAREHOUSE=motherduck uv run sqlmesh create_external_models && WA
 ```
 After that every Garmin load is followed by a weather load, which fetches weather for new activities, and fetches the last week again because Open-Meteo revises recent days.
 
+**14. Data quality.** Two layers:
+- **SQLMesh audits** stop a run when data is *wrong*: unique keys, not-null columns, value ranges (a resting heart rate between 25 and 120, a weight between 20 and 300 kg), and no best effort faster than 2:11/km, the 1000 m world record, which catches anything the filters below miss. `z_score_non_blocking` on resting heart rate warns about days more than 4 standard deviations from the usual, without stopping the run; on a daily run it only sees the days being processed, so it does most on a full `plan`. SQLMesh's built-in audits include the statistical checks dbt-expectations is known for (`z_score`, `kl_divergence`, `chi_square`, `mean_in_range`, `stddev_in_range`).
+- **Flags** mark data that's real but *suspect*, in the models:
+  - `staging.stg_activity_samples.is_gps_jump`: the distance moved faster than 8 m/s since the previous sample *and* 20 m further than the watch's own speed accounts for. The 2:35 "best 1 km" from New York in 2018 was one of these: one second moved 135 m.
+  - `marts.fct_activity_quality`, one row per activity: the likely real type from the cadence and the watch's speed while moving (run, ride or walk; over 8 m/s for half a minute is a vehicle), `is_type_mismatch` when that disagrees with what was recorded, and `is_gps_suspect` for runs with 3+ jumps.
+  - `marts.fct_weight_daily.is_suspect`: more than 3 kg from the previous weigh-in within a week, or from the day's lowest reading.
+
+`fct_best_efforts` leaves out activities that weren't runs and any stretch containing a GPS jump or a vehicle's speed, so one bad second doesn't cost a whole run its other efforts. The Evidence *Data quality* page lists every flag. Airflow's `data_checks` DAG (09:00 UTC) runs `transform/data_checks.py` and sends an ntfy notification for each new flag from the last 14 days, and one if Garmin data is more than 2 days behind (the loads failing quietly, or the Personal API key expiring after its year).
+
 **SQL linting.** Two linters, for different things:
 - **SQLMesh's linter** checks correctness against the real tables. It runs on every `sqlmesh plan`, and on its own with `cd transform && uv run sqlmesh lint`. Ambiguous or unknown columns, `SELECT *`, unregistered raw tables and unnamed columns stop the plan; a model without audits is a warning. The rules are in `transform/config.py`.
 - **SQLFluff** checks style: layout, capitalisation, aliases, join style. Run `uv run python transform/lint_sql.py` to report problems, or add `--fix` to fix what it can. SQLFluff can't parse SQLMesh's `MODEL (...)` header or `@macros`, so the script hides them while SQLFluff runs and puts them back after a fix, so don't run `sqlfluff` directly. The rules are in `.sqlfluff`. Check a fix before committing it: AL05 once deleted an alias that named a `VALUES` list's columns.
@@ -195,6 +205,7 @@ airflow/run.sh dags test garmin_poll   # one run of one DAG in the terminal
 | `withings_poll` | every 30 min | asks Withings for weigh-ins changed since the last load; only if there are any, loads Withings |
 | `transform` | when `raw_weather` or `raw_withings` updates | `sqlmesh run prod --ignore-cron` |
 | `rebuild_dashboards` | Mon + Thu 08:00 UTC | Netlify build hook |
+| `data_checks` | 09:00 UTC | phone notifications for new data-quality flags and stale Garmin data (step 14) |
 
 The loads hand over to `transform` through Airflow Assets: a load task with `outlets=[asset]` records an event when it succeeds, and `transform` is scheduled on those assets. The checks are single API calls that don't touch MotherDuck, so polling costs no warehouse compute. The models have `allow_partials`, so `--ignore-cron` processes today so far and new data reaches the marts within the hour, not after midnight; a plain `sqlmesh run` still only processes finished days. One-slot pools (`garmin_api`, `withings_api`) stop two DAGs loading the same source at once. The Airflow Variable `garmin_seen_activity_ids` holds the activity ids already loaded.
 
