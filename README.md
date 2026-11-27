@@ -177,14 +177,15 @@ The DAGs start paused. Pause the Prefect deployment before switching them on, or
 
 **Airflow on a server (Oracle Cloud Always Free).** `airflow/server/` runs the same DAGs with Docker Compose: Postgres for Airflow's database, the scheduler with the LocalExecutor, the DAG processor, the triggerer and the API server. The tasks' `uv run` builds the pipeline's venv in `airflow/server/state/` (gitignored) on first start. The UI listens only on the server's `127.0.0.1:8080`, so no port but SSH is open; reach it through a tunnel and log in as `admin` with the password in `airflow/server/state/passwords.json`.
 ```bash
-# on the server (Ubuntu, ARM), once
+# on the server (Oracle Linux 9 or Ubuntu, ARM), once; the user is opc on Oracle Linux, ubuntu on Ubuntu
+sudo dnf install -y git   # Oracle Linux only
 git clone https://github.com/sammurphych/garmin-data-poc.git
 # on the laptop
-scp .env ubuntu@<server>:garmin-data-poc/
+scp .env opc@<server>:garmin-data-poc/
 # on the server: installs Docker, generates Airflow's secrets in airflow/server/.env, starts everything
 garmin-data-poc/airflow/server/install.sh
 # on the laptop, to use the UI at http://localhost:8080
-ssh -N -L 8080:localhost:8080 ubuntu@<server>
+ssh -N -L 8080:localhost:8080 opc@<server>
 # deploy a change: on the server
 cd garmin-data-poc && git pull && airflow/server/install.sh
 ```

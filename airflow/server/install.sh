@@ -1,8 +1,10 @@
 #!/bin/sh
-# Sets up Airflow on a fresh Ubuntu server (an Oracle Cloud Always Free VM), from the cloned repo:
+# Sets up Airflow on a fresh Oracle Linux 9 or Ubuntu server (an Oracle Cloud Always Free VM), from the cloned repo:
 #
+#   sudo dnf install -y git        # Oracle Linux only; Ubuntu has git
 #   git clone https://github.com/sammurphych/garmin-data-poc.git && cd garmin-data-poc
-#   (copy the laptop's .env to the repo root first: scp .env ubuntu@<server>:garmin-data-poc/)
+#   (copy the laptop's .env to the repo root first: scp .env <user>@<server>:garmin-data-poc/)
+#   The user is opc on Oracle Linux and ubuntu on Ubuntu.
 #   airflow/server/install.sh
 #
 # Safe to run again: it keeps the generated secrets and the database, and rebuilds and restarts the rest.
@@ -20,7 +22,15 @@ if ! swapon --show | grep -q /swapfile; then
 fi
 
 if ! command -v docker >/dev/null; then
-  curl -fsSL https://get.docker.com | sudo sh
+  if command -v dnf >/dev/null; then
+    # Oracle Linux: Docker's own script doesn't cover it, but Docker's RHEL packages work on it.
+    sudo dnf install -y dnf-plugins-core
+    sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+    sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo systemctl enable --now docker
+  else
+    curl -fsSL https://get.docker.com | sudo sh
+  fi
   sudo usermod -aG docker "$USER"
 fi
 # The first run adds us to the docker group, which only applies to new logins, so use sudo until then.
