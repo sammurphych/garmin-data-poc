@@ -15,3 +15,7 @@ sqlmesh_state.json
 airflow/home/
 airflow/.constraints.txt
 airflow/server/state/
+infra/**/.terraform/
+infra/**/terraform.tfstate*
+infra/**/terraform.tfvars
+infra/**/*.tfplan

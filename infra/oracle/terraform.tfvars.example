@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (gitignored). The tenancy OCID is "tenancy=" in ~/.oci/config.
+tenancy_ocid = "ocid1.tenancy.oc1..aaaa..."

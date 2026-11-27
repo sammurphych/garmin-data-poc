@@ -39,7 +39,8 @@ flowchart LR
 | [Evidence](https://evidence.dev) | the dashboards, built as a static site | Netlify |
 | [Cube](https://cube.dev) | semantic layer (`health`, `training`, `body`, `splits`, `efforts` views) over the marts | Render |
 | MCP server | lets Claude query Cube: *"How has my 10 km pace changed since last summer?"* | Render, and locally for Claude Code |
-| [ntfy](https://ntfy.sh) | a phone notification when a task fails | ntfy.sh |
+| [ntfy](https://ntfy.sh) | a phone notification when a task fails or data looks wrong | ntfy.sh |
+| [Terraform](https://www.terraform.io) | the Oracle network and server as code | the laptop |
 
 ## Problems worth a look
 
@@ -57,6 +58,7 @@ flowchart LR
 | `ingest/` | dlt sources: Garmin Personal API (`daily_summaries`, `activities` with `split_summaries`, `activity_samples`, `sleep`, `hrv`, `vo2max`), Withings (`measures`: weight and body composition) and Open-Meteo (`hourly` weather for the area each activity starts in); `changes.py` has the cheap new-data checks |
 | `transform/` | SQLMesh project (`config.py` picks the gateway: `local` or `motherduck`) |
 | `airflow/` | the DAGs, a local setup (`setup.sh`, `run.sh`) and the server's Docker Compose stack (`server/`) |
+| `infra/oracle/` | Terraform for the Oracle Cloud network and server |
 | `semantic/` | Cube models and views, Render Dockerfile, MCP servers, local-model chat |
 | `dashboards/` | Evidence project; `netlify.toml` builds it on Netlify |
 
@@ -230,6 +232,18 @@ cd garmin-data-poc && git pull && airflow/server/install.sh
 Run Airflow in one place at a time: pause the laptop's DAGs (or stop `standalone`) before switching the server's on. The server's install script also prints an [ntfy](https://ntfy.sh) topic: subscribe to it in the ntfy phone app, and every task that fails after its retries sends a notification with the error and a link to its log.
 
 An Oracle Always Free A1 instance (1 OCPU, 6 GB, Oracle Linux 9) is enough. Creating one may fail with "out of capacity"; another availability domain or a later try usually works.
+
+## Infrastructure as code (Terraform)
+
+`infra/oracle/` describes the Oracle Cloud resources in Terraform: the VCN with its public and private subnets, gateways, route tables and security lists (only SSH open to the internet), and the A1 server. They were first made by hand in the console, then adopted with Terraform's `import` blocks and `plan -generate-config-out`, and the generated code was rewritten until `terraform plan` showed no changes, so the import itself changed nothing. The server and the VCN have `prevent_destroy`, and a newer Oracle Linux image doesn't replace the running server.
+
+```bash
+# once: an API key from the Oracle console (My profile → API keys) in ~/.oci/config, and the tenancy OCID
+cp infra/oracle/terraform.tfvars.example infra/oracle/terraform.tfvars
+cd infra/oracle && terraform init
+terraform plan     # expect "No changes"
+```
+The state is a local file (`terraform.tfstate`, gitignored, like the tfvars), so it lives on the laptop; keep a copy, or move it to an OCI Object Storage backend (free) to share it between machines.
 
 ## Notes and limits
 - The Garmin Personal API is read-only and covers your own data only. Rate limits aren't published, so the client pauses 0.5s between calls. Max ranges are 1 year (daily summaries), 31 days (sleep) and 28 days (HRV, conservative).
