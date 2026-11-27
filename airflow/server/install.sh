@@ -13,6 +13,12 @@ REPO="$(cd ../.. && pwd)"
 [ -f "$REPO/.env" ] || { echo "Copy the pipeline's .env to $REPO/.env first (scp from the laptop)."; exit 1; }
 chmod 600 "$REPO/.env"
 
+# A 2 GB swap file, so a memory spike (the first venv build, a big SQLMesh run) slows down instead of crashing.
+if ! swapon --show | grep -q /swapfile; then
+  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+  grep -q /swapfile /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
+
 if ! command -v docker >/dev/null; then
   curl -fsSL https://get.docker.com | sudo sh
   sudo usermod -aG docker "$USER"
