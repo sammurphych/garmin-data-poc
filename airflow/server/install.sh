@@ -49,6 +49,9 @@ EOF
   umask 022
 fi
 
+# The ntfy.sh topic for failure alerts: a long random name, since anyone who knows it can read it.
+grep -q '^NTFY_TOPIC=' .env || echo "NTFY_TOPIC=health-airflow-$(openssl rand -hex 12)" >> .env
+
 mkdir -p state/logs
 if [ ! -f state/passwords.json ]; then
   printf '{"admin": "%s"}\n' "$(openssl rand -hex 12)" > state/passwords.json
@@ -60,3 +63,4 @@ echo
 echo "Airflow is starting (the first start builds the pipeline's venv, a few minutes)."
 echo "From the laptop:  ssh -L 8080:localhost:8080 $USER@<this server>   then open http://localhost:8080"
 echo "Login: admin / $(sed 's/.*: "\(.*\)".*/\1/' state/passwords.json)"
+echo "Failure alerts: subscribe to this topic in the ntfy app:  $(sed -n 's/^NTFY_TOPIC=//p' .env)"

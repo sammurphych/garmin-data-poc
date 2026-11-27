@@ -18,9 +18,12 @@ meet dlt's, SQLMesh's or Prefect's. The pipeline and SQLMesh read their secrets 
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import urllib.request
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from airflow.sdk import Asset, Variable, task
 
@@ -39,7 +42,32 @@ WITHINGS_POOL = "withings_api"
 # The Garmin activity ids already loaded, so garmin_poll can tell when a new one appears.
 SEEN_ACTIVITIES = "garmin_seen_activity_ids"
 
-DEFAULT_ARGS = {"retries": 1, "retry_delay": timedelta(minutes=5)}
+
+
+def notify_failure(context) -> None:
+    """Sends a phone notification through ntfy.sh when a task has failed for good (after its retries).
+    NTFY_TOPIC is set on the server only; anyone who knows the topic can read it, so it's a long random
+    name kept out of the repo. Without it (the laptop) this does nothing."""
+    topic = os.getenv("NTFY_TOPIC")
+    if not topic:
+        return
+    ti = context["ti"]
+    run_id = context["run_id"]
+    error = str(context.get("exception") or "no error message")[:300]
+    request = urllib.request.Request(f"https://ntfy.sh/{topic}", data=error.encode(), headers={
+        "Title": f"{ti.dag_id}: {ti.task_id} failed",
+        "Tags": "warning",
+        "Priority": "high",
+        # Opens the task's log, through the SSH tunnel.
+        "Click": f"http://localhost:8080/dags/{ti.dag_id}/runs/{quote(run_id, safe='')}/tasks/{ti.task_id}",
+    })
+    try:
+        urllib.request.urlopen(request, timeout=10)
+    except Exception as e:  # a failed alert mustn't hide the task's own error
+        print(f"Couldn't send the ntfy alert: {e}")
+
+
+DEFAULT_ARGS = {"retries": 1, "retry_delay": timedelta(minutes=5), "on_failure_callback": notify_failure}
 
 
 def pipeline(source: str) -> str:

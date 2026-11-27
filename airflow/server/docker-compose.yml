@@ -29,6 +29,8 @@ x-airflow: &airflow
     UV_PROJECT_ENVIRONMENT: /opt/state/venv
     UV_CACHE_DIR: /opt/state/uv-cache
     DLT_PIPELINES_DIR: /opt/state/dlt
+    # The ntfy.sh topic for failure alerts on the phone (health_common.notify_failure), from .env here.
+    NTFY_TOPIC: ${NTFY_TOPIC:-}
   volumes:
     - ../..:/opt/health        # the repo, with its .env holding the pipeline's secrets
     - ./state:/opt/state
