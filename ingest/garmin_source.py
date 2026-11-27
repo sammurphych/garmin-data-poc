@@ -1,7 +1,7 @@
 """dlt source for the Garmin Connect Personal API (read-only, own data).
 
 Each resource keeps the last loaded date in dlt state (stored in the destination,
-so it survives ephemeral Prefect Managed workers). Every run re-pulls the last
+so a fresh machine or container picks up where the last load stopped). Every run re-pulls the last
 `lookback_days` because Garmin keeps updating recent days (late syncs, sleep
 scoring), and `merge` on the natural key keeps rows unique.
 """

@@ -3,7 +3,7 @@
 Withings rotates the refresh token on every use (the old one stops working 8 hours
 later), so the current token has one home: the table `health_app.withings_token` in
 the project's Postgres (SQLMESH_STATE_DB_URL, the Neon database that also holds
-SQLMesh's state). The laptop, the Airflow server and Prefect all read it from there
+SQLMesh's state). The laptop and the Airflow server both read it from there
 and write the new token back, so they never drift apart.
 
 A refresh also returns a 3-hour access token, which is kept next to it and reused

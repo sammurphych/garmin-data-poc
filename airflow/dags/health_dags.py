@@ -1,8 +1,7 @@
 """The health pipeline as five DAGs that hand over through Assets; see health_common.py for the picture.
 
-Everything starts paused. While Prefect still runs the daily job, switching these on means both load
-every day (harmless: loads merge on keys) and both rebuild the dashboards on Mondays and Thursdays
-(costs Netlify credits), so pause the Prefect deployment first.
+Everything starts paused. Run them in one place at a time (the laptop or the server): two copies would
+both load and both rebuild the dashboards, which costs Netlify credits.
 """
 
 from __future__ import annotations

@@ -12,7 +12,7 @@ runs after it. raw_garmin has no DAG of its own: weather loads straight after Ga
 waits for weather so new activities have their weather too.
 
 The tasks run the pipeline in the project's own venv with `uv run`, so Airflow's pinned dependencies never
-meet dlt's, SQLMesh's or Prefect's. The pipeline and SQLMesh read their secrets from the repo's .env.
+meet dlt's or SQLMesh's. The pipeline and SQLMesh read their secrets from the repo's .env.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 # Netlify builds the Evidence site itself (no GitHub Actions).
 # Set env var EVIDENCE_SOURCE__motherduck__token in Netlify (the dashboards token, MOTHERDUCK_READ_TOKEN in .env).
-# Prefect's last task POSTs to this site's build hook on Mondays and Thursdays (see flows/garmin_daily.py).
+# Airflow's rebuild_dashboards DAG POSTs to this site's build hook on Mondays and Thursdays.
 [build]
   base    = "dashboards"
   command = "npm run sources && npm run build"
