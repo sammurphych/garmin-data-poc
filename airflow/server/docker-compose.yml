@@ -56,8 +56,10 @@ services:
   init:
     <<: *airflow
     restart: "no"
-    entrypoint: /bin/bash
+    # Through the image's entrypoint (it runs `bash` commands as given), which sets up the environment
+    # Airflow needs when it runs as a user other than the image's own.
     command:
+      - bash
       - -c
       - |
         set -e
