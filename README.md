@@ -4,6 +4,10 @@ A side project to try some data tools on something I care about: my running. Gar
 
 **Live dashboards: [dainty-toffee-9e280f.netlify.app](https://dainty-toffee-9e280f.netlify.app)** (Running, Activities and Weight pages).
 
+![Running page: personal bests and the fastest 5 km each year](docs/images/running-bests.png)
+
+![Pace and heart rate by feels-like temperature](docs/images/running-heat.png)
+
 ## How it fits together
 
 ```mermaid
